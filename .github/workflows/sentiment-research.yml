@@ -1,0 +1,47 @@
+name: AlgoArena sentiment research
+
+on:
+  pull_request:
+    paths:
+      - 'algoarena_sentiment_v4.py'
+      - 'algoarena_sharpe_v3.py'
+      - 'requirements.txt'
+      - '.github/workflows/sentiment-research.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m pytest -q
+      - name: Evaluate on official labelled parquet data
+        run: python algoarena_sentiment_v4.py --no-submission --output-dir runs/github-validation
+      - name: Print measured Sharpes
+        if: success()
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open("runs/github-validation/report.json"))
+          print("Validation:",r["selection"]["oof_sharpe"])
+          print("Audit Sharpe:",r["audit"]["sharpe"])
+          print("Audit minus target:",r["audit"]["sharpe"]-3.65)
+          print("Signal:",r["selection"]["kind"])
+          PY
+      - name: Save reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: sentiment-debug
+          path: runs/github-validation/
+          if-no-files-found: warn
+          retention-days: 14
