@@ -156,3 +156,17 @@ exists.
 
 **3.65 Sharpe remains a target.** The best exploratory audit reached 2.470.
 The official hidden-test Sharpe is unknown.
+
+
+## Python compatibility and optional charts
+
+Use Python 3.11 and install from `requirements.txt`, which pins NumPy to the 1.x ABI to avoid older compiled extensions failing against NumPy 2. By default the model always produces Sharpe logs, CSV metrics and `predictions.csv`, but skips Matplotlib charts. To request PNG charts after installing a compatible Matplotlib build, set `ALGOARENA_PLOTS=1` before running.
+
+If an existing Windows Python environment has the incompatible NumPy 2 / Matplotlib combination, create a fresh virtual environment:
+
+```powershell
+py -3.11 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -U pip
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+.\.venv\Scripts\python.exe make_submission.py
+```
