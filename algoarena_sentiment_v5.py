@@ -402,6 +402,9 @@ def explain_coefficients(encoder, model, kind="combined"):
 
 
 def plot_audit(preds):
+    if os.environ.get("ALGOARENA_PLOTS") != "1":
+        LOG.info("PLOTS | skipped; CSV reports and Sharpe diagnostics are still saved")
+        return
     try:
         import matplotlib.pyplot as plt
         pnl = preds["pnl"].to_numpy()
@@ -418,8 +421,8 @@ def plot_audit(preds):
         fig.tight_layout()
         fig.savefig(OUTPUT_DIR / "audit_pnl_distribution.png", dpi=140)
         plt.close(fig)
-    except ImportError:
-        LOG.warning("matplotlib is not installed; skipped the diagnostic plots")
+    except (ImportError, AttributeError, RuntimeError, OSError) as exc:
+        LOG.warning("PLOTS | skipped because matplotlib failed: %s", exc)
 
 
 def run_pipeline(create_submission=True, data_dir=None, output_dir=None, sessions_module=None):
