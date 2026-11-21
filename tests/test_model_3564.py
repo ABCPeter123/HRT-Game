@@ -35,3 +35,15 @@ def test_news_model_stays_the_same():
 
     result = predict_session(model, opened, high, low, close, [headline], [45])
     assert np.isclose(result, 347.2995782918922, rtol=1e-10)
+
+def test_fitted_model_keys(monkeypatch):
+    import model_3564 as source
+
+    monkeypatch.setattr(source, "oof_base_features", lambda *a, **k: "features")
+    monkeypatch.setattr(source, "fit_stage2", lambda *a, **k: {"beta": [1]})
+    monkeypatch.setattr(source, "fit_base", lambda *a, **k: {"A": {}})
+
+    result = source.train({"sessions": np.arange(10)}, np.ones(10))
+    assert set(result) == {"P", "S", "cfg"}
+    assert result["P"] == {"A": {}}
+    assert result["S"] == {"beta": [1]}
