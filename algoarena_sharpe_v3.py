@@ -1,9 +1,9 @@
 """AlgoArena Sharpe-first experiment (v3).
 
 Run with the competition-provided sessions.py and ins_*/oos_* parquet files:
-    python algoarena_sharpe_v3.py --data-dir data
+    python algoarena_sharpe_v3.py
 
-Saves all validation, audit, and feature diagnostics in runs/latest.
+Saves validation, audit, and feature diagnostics in timestamped runs/ folders.
 Never reads bars 50+ or out-of-sample labels. Creates predictions.csv locally;
 submissions to the competition website remain manual.
 """
@@ -67,19 +67,21 @@ def configure_logging(output_dir):
 
 
 def find_competition_data(data_dir=None):
-    """Find official data files, without assuming that they are committed to GitHub."""
+    """Locate the complete official data set in the repository root or data/."""
     if data_dir is not None:
         candidates = [Path(data_dir).expanduser().resolve()]
     else:
         candidates = [PROJECT_ROOT / "data", PROJECT_ROOT, Path.cwd() / "data",
                       Path.cwd(), Path("/content"), Path("/content/HRT-Game/data")]
+    required = ("sessions.py", "ins_bars.parquet", "ins_headlines.parquet",
+                "ins_returns.parquet", "oos_bars.parquet", "oos_headlines.parquet")
     for folder in candidates:
-        if (folder / "sessions.py").is_file() and list(folder.glob("ins_*.parquet")) and list(folder.glob("oos_*.parquet")):
+        if all((folder / name).is_file() for name in required):
             return folder.resolve()
     raise FileNotFoundError(
-        "Competition files not found. Place sessions.py, ins_*.parquet, and "
-        "oos_*.parquet together in ./data/ or supply --data-dir PATH. "
-        "See README.md for the download command. Search paths: "
+        "Competition files missing. Expected sessions.py and five parquet files "
+        "together in the repository root or ./data/. "
+        "Supply --data-dir PATH to override. Search paths: "
         + ", ".join(str(p) for p in candidates))
 
 
@@ -183,7 +185,7 @@ def sharpe(pnl):
     pnl = np.asarray(pnl, dtype=float)
     if len(pnl) < 2 or np.std(pnl) < 1e-12:
         return 0.0
-    return float(np.sqrt(252.0) * np.mean(pnl) / np.std(pnl))
+    return float(np.sqrt(252.0) * np.mean(pnl) / np.std(pnl, ddof=1))
 
 
 def metrics(position, y, cost_bps=0.0):
@@ -426,7 +428,7 @@ def run_pipeline(create_submission=True, data_dir=None, output_dir=None, session
              audit_metrics["sharpe_with_hypothetical_20bps_each_side"])
 
     report = dict(
-        label="AlgoArena baseline v2, Sharpe-first, blocked validation, sealed audit",
+        label="AlgoArena baseline v3, Sharpe-first, blocked validation, sealed audit",
         rules={"target": "market-adjusted close49 to close59 return",
                "pnl": "position times return", "sharpe_annualization": 252,
                "notes": ["Session order is not documented as chronological; splits are ordered by row index.",
@@ -449,13 +451,30 @@ def run_pipeline(create_submission=True, data_dir=None, output_dir=None, session
         full_ref_vol = float(np.median(v_full))
         explain_coefficients(final_encoder, final_model)
 
-        def my_prediction(row):
-            x, vols = final_encoder.transform([feature_row(row)])
-            raw = final_model.predict(x)
-            return float(predict_positions(raw, vols, full_scale, full_ref_vol,
-                                           threshold, vol_exp)[0])
-
-        oos = sessions.get_oos_predictions(my_prediction)
+        if hasattr(sessions, "get_oos_data"):
+            # Official sessions.py exposes the 0..49 session view. Transform in
+            # batches instead of doing TF-IDF work one sample at a time.
+            oos = sessions.get_oos_data().copy()
+            LOG.info("OOS INFERENCE | Encoding %s sessions in batches", f"{len(oos):,}")
+            predictions = []
+            batch_size = 512
+            for start in range(0, len(oos), batch_size):
+                batch = oos.iloc[start : start + batch_size]
+                features = [feature_row(row) for _, row in batch.iterrows()]
+                x_batch, vols = final_encoder.transform(features)
+                raw = final_model.predict(x_batch)
+                predictions.extend(predict_positions(raw, vols, full_scale, full_ref_vol,
+                                                     threshold, vol_exp).tolist())
+            oos["pred"] = np.asarray(predictions, dtype=float)
+            LOG.info("OOS INFERENCE | Completed %s sessions", f"{len(oos):,}")
+        else:
+            # Support synthetic test adapters exposing the per-row interface.
+            def my_prediction(row):
+                x, vols = final_encoder.transform([feature_row(row)])
+                raw = final_model.predict(x)
+                return float(predict_positions(raw, vols, full_scale, full_ref_vol,
+                                               threshold, vol_exp)[0])
+            oos = sessions.get_oos_predictions(my_prediction)
         if "pred" not in oos.columns or not np.isfinite(oos["pred"].to_numpy(dtype=float)).all():
             raise ValueError("Out-of-sample predictions are missing or non-finite")
         submission_path = PROJECT_ROOT / "predictions.csv"
