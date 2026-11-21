@@ -6,3 +6,6 @@ matplotlib>=3.7,<4
 pyarrow>=12
 gdown>=5.0
 pytest>=7.0
+attrs>=23.0
+rich>=13.0
+tqdm>=4.65
