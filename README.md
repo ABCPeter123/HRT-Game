@@ -122,3 +122,6 @@ The target Sharpe is **3.65**. It is a research target, not an assumed result.
 Strong validation alone does not establish hidden out-of-sample performance.
 
 Colab users can open `notebooks/AlgoArena_Sentiment_v4.ipynb`.
+
+The short, readable entry point for the final CSV is `python make_submission.py`.
+It calls the validated v4 pipeline and writes `predictions.csv`; it does not upload it.
