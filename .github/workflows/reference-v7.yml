@@ -1,0 +1,31 @@
+name: Reference-inspired Sharpe experiment
+on:
+  pull_request:
+    paths:
+      - experiment_v7.py
+      - tests/test_experiment_v7.py
+      - .github/workflows/reference-v7.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - run: python -m pytest -q tests/test_experiment_v7.py
+      - name: Evaluate actual training parquet data
+        run: python experiment_v7.py --no-submission
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reference-v7-results
+          path: runs/v7_reference
