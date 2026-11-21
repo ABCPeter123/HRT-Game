@@ -78,7 +78,6 @@ def test_pipeline_exports_sharpe_reports_and_submission(tmp_path, monkeypatch):
     for name in (
         "run.log", "report.json", "candidate_scores.csv", "fold_metrics.csv",
         "audit_predictions.csv", "audit_breakdowns.csv", "top_model_features.csv",
-        "audit_equity_curve.png", "audit_pnl_distribution.png",
     ):
         assert (report_dir / name).exists(), name
     candidates = pd.read_csv(report_dir / "candidate_scores.csv")
@@ -87,3 +86,18 @@ def test_pipeline_exports_sharpe_reports_and_submission(tmp_path, monkeypatch):
     assert list(submission.columns) == ["headline_id", "pred"]
     assert len(submission) == len(oos)
     assert np.isfinite(submission["pred"]).all()
+
+def test_debug_plots_are_optional(tmp_path, monkeypatch):
+    import builtins
+    import os
+    monkeypatch.delenv("ALGOARENA_PLOTS", raising=False)
+    model.configure_logging(tmp_path)
+    imported = builtins.__import__
+
+    def blocked(name, *args, **kwargs):
+        if name.startswith("matplotlib"):
+            raise AssertionError("Plotting library loaded without request")
+        return imported(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", blocked)
+    model.plot_audit(pd.DataFrame({"pnl": [0.02, -0.01, 0.03]}))
