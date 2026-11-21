@@ -35,8 +35,8 @@ def default_run_dir():
     """Make experiments independently auditable across model iterations."""
     return PROJECT_ROOT / "runs" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ")
 ALPHAS = (0.1, 1.0, 10.0, 100.0)
-THRESHOLDS = (0.0, 0.25, 0.50)
-VOL_EXPONENTS = (0.0, 0.5)
+THRESHOLDS = (0.0, 0.25, 0.50, 0.75, 1.0, 1.5)
+VOL_EXPONENTS = (0.0, 0.5, 1.0, 1.5)
 NUMERIC_WEIGHT = 0.35
 MAX_POSITION = 3.0
 MIN_TRADE_RATE = 0.08
