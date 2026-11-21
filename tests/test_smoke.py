@@ -39,9 +39,14 @@ def test_data_discovery_requires_official_files(tmp_path):
     data = tmp_path / "data"
     data.mkdir()
     (data / "sessions.py").write_text("# synthetic fixture")
-    (data / "ins_one.parquet").write_bytes(b"fixture")
-    (data / "oos_one.parquet").write_bytes(b"fixture")
+    for name in ("ins_bars.parquet", "ins_headlines.parquet", "ins_returns.parquet",
+                 "oos_bars.parquet", "oos_headlines.parquet"):
+        (data / name).write_bytes(b"fixture")
     assert model.find_competition_data(data) == data.resolve()
+    (data / "ins_returns.parquet").unlink()
+    import pytest
+    with pytest.raises(FileNotFoundError):
+        model.find_competition_data(data)
 
 
 def test_pipeline_exports_sharpe_reports_and_submission(tmp_path, monkeypatch):
@@ -56,6 +61,7 @@ def test_pipeline_exports_sharpe_reports_and_submission(tmp_path, monkeypatch):
         return out
 
     competition.get_oos_predictions = get_oos_predictions
+    competition.get_oos_data = lambda: oos
 
     def write_submission(prediction_df, path):
         pd.DataFrame({
