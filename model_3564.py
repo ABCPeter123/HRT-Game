@@ -1,24 +1,3 @@
-"""HRT synthetic-stock challenge: final model.
-
-Model in one paragraph
-----------------------
-Each session's stock is one of the ~4 fictional companies named in the headlines. A headline
-published in bar b moves the price as a linear ramp over the next ~10 bars (half a bar at
-lag 0, full bars at lags 1-9, half a bar at lag 10), with a total move of
-    role_coef * A_etype * sigma_session
-where A_etype is a per-event-type amplitude (50 parsed templates, amounts/percentages do
-not matter), role_coef is ~2.5 if the headline is about the stock itself, ~0.75 for a
-same-sector peer and ~0.13 for an unrelated company. Which company is the stock is not
-given, so we compute a posterior over the candidates from how bars 0-49 reacted to each
-company's past headlines (Gaussian likelihood on normalised bar returns, tempered), and
-take the posterior-weighted remaining drift over bars 50-59 of headlines published in
-bars 40-49. A small mean-reversion term (price level vs. news-explained level) is added,
-the forecast is turned into a position E[r]/Var[r] ~ forecast/sigma, and clipped.
-
-All parameters (A_etype, role coefficients, priors, regression weights, clip bounds) are
-fitted on in-sample data only; the stage-2 weights are fitted on out-of-fold base features.
-Prediction inputs use only bars 0-49 and headlines with bar_ix <= 49.
-"""
 from __future__ import annotations
 
 import os
@@ -30,28 +9,24 @@ import pandas as pd
 import scipy.sparse as sp
 from scipy.sparse.linalg import lsqr
 
-T0 = 49          # trade at close of bar 49
-HOR = 10         # hold to close of bar 59
+T0 = 49          
+HOR = 10         
 NBARS = 100
 KERNEL = np.array([0.05] + [0.1] * 9 + [0.05])
 NK = len(KERNEL)
 LOG2 = np.log(2.0)
 
-# Final hyperparameters (chosen by nested 5-fold CV, see REPORT.md)
 CONFIG = dict(
-    temp=2.0,          # likelihood tempering for the stock-identity posterior
-    sig_power=1.0,     # position = forecast_in_vol_units / sigma**sig_power
-    clip_q=0.02,       # clip positions at the 2% / 98% quantiles of training positions
-    use_dev=True,      # include mean-reversion term
-    naive=False,       # True: ignore stock identity (all companies weighted equally)
+    temp=2.0,          
+    sig_power=1.0,     
+    clip_q=0.02,       
+    use_dev=True,      
+    naive=False,       
     em_iters=8,
     n_inner=5,
     seed=20261121,
 )
 
-# --------------------------------------------------------------------------------------
-# Headline parsing
-# --------------------------------------------------------------------------------------
 _TITLES = {"Chief", "CTO", "CFO", "CEO", "COO"}
 _SEGMENTS = ["automated logistics", "wireless connectivity", "digital payments", "renewable storage",
              "cloud infrastructure", "supply chain optimization", "data analytics", "enterprise software",
@@ -76,14 +51,12 @@ _SECTOR_OF_SUFFIX = {
     "Industries": "industrial",
 }
 
-
 def split_company(s: str):
     toks = str(s).split()
     i = 0
     while i < len(toks) and toks[i][:1].isupper() and toks[i] not in _TITLES:
         i += 1
     return " ".join(toks[:i]), " ".join(toks[i:])
-
 
 def parse_headline(s: str) -> dict:
     company, t = split_company(s)
@@ -107,9 +80,7 @@ def parse_headline(s: str) -> dict:
     out["etype"] = t
     return out
 
-
 _PCACHE: dict = {}
-
 
 def parse_cached(s: str) -> dict:
     d = _PCACHE.get(s)
@@ -118,61 +89,48 @@ def parse_cached(s: str) -> dict:
         _PCACHE[s] = d
     return d
 
-
 def sector(company: str) -> str:
     parts = str(company).split()
     return _SECTOR_OF_SUFFIX.get(parts[1], "other") if len(parts) > 1 else "other"
 
-
-# --------------------------------------------------------------------------------------
-# Price helpers
-# --------------------------------------------------------------------------------------
 def bar_log_returns(o, c):
     lc = np.log(np.asarray(c, float))
     return np.diff(np.concatenate([[np.log(float(o[0]))], lc]))
 
-
 def gk_vol(o, h, l, c):
-    """Garman-Klass per-bar volatility (better forecast of future vol than close-to-close)."""
+
     lo, lh, ll, lc = (np.log(np.asarray(x, float)) for x in (o, h, l, c))
     v = np.mean(0.5 * (lh - ll) ** 2 - (2 * LOG2 - 1) * (lc - lo) ** 2, axis=-1)
     return np.sqrt(np.maximum(v, 1e-14))
-
 
 def window_weight(b, t0=T0, hor=HOR):
     lags = np.arange(t0 + 1, t0 + hor + 1) - b
     m = (lags >= 0) & (lags < NK)
     return float(KERNEL[lags[m]].sum())
 
-
-# --------------------------------------------------------------------------------------
-# Stock-identity model
-# --------------------------------------------------------------------------------------
 def company_design(bars, amps, comps, n):
     order = list(dict.fromkeys(comps))
     ci = {c: i for i, c in enumerate(order)}
-    Xc = np.zeros((len(order), n))
+    company_paths = np.zeros((len(order), n))
     for b, a, c in zip(bars, amps, comps):
         b = int(b)
         if b >= n or a == 0.0:
             continue
         e = min(n, b + NK)
-        Xc[ci[c], b:e] += a * KERNEL[: e - b]
-    return order, Xc
+        company_paths[ci[c], b:e] += a * KERNEL[: e - b]
+    return order, company_paths
 
-
-def role_design(Xc, secs, c, main_sec=None):
+def role_design(company_paths, secs, c, main_sec=None):
     k = len(secs)
-    if c is None:  # stock not yet mentioned
+    if c is None:  
         same = [j for j in range(k) if secs[j] == main_sec]
-        xs = np.zeros(Xc.shape[1])
+        xs = np.zeros(company_paths.shape[1])
     else:
         same = [j for j in range(k) if j != c and secs[j] == secs[c]]
-        xs = Xc[c]
-    xp = Xc[same].sum(0) if same else np.zeros(Xc.shape[1])
-    xo = Xc.sum(0) - xs - xp
+        xs = company_paths[c]
+    xp = company_paths[same].sum(0) if same else np.zeros(company_paths.shape[1])
+    xo = company_paths.sum(0) - xs - xp
     return np.stack([xs, xp, xo], 1)
-
 
 def _main_sector(secs, counts):
     best, key = None, None
@@ -182,61 +140,52 @@ def _main_sector(secs, counts):
             best, key = s, kk
     return best
 
-
 def stock_signal(y, bars, etypes, comps, A, coef, prior_w, temp=1.0, n_total=4, t0=T0):
-    """Posterior-weighted remaining drift over bars t0+1..t0+HOR, in vol units.
 
-    y: normalised demeaned bar returns for bars 0..t0.
-    """
     n = len(y)
     amps = [A.get(e, 0.0) for e in etypes]
-    order, Xc = company_design(bars, amps, comps, n)
+    order, company_paths = company_design(bars, amps, comps, n)
     k = len(order)
     if k == 0:
         return dict(m=0.0, cum=0.0, m_var=0.0, pmax=0.0)
     secs = [sector(c) for c in order]
     counts = [sum(1 for x in comps if x == c) for c in order]
     msec = _main_sector(secs, counts)
-    fw = np.zeros(k)
+    future_events = np.zeros(k)
     ci = {c: i for i, c in enumerate(order)}
     for b, a, c in zip(bars, amps, comps):
         w = window_weight(int(b), t0)
         if w > 0:
-            fw[ci[c]] += a * w
+            future_events[ci[c]] += a * w
     p_unseen = max(n_total - k, 0) / n_total
     w_obs = np.array([prior_w[min(sum(1 for s in secs if s == secs[j]), 4)] for j in range(k)], float)
     w_obs = w_obs / w_obs.sum()
     cands = list(range(k)) + [None]
     priors = np.array([(1 - p_unseen) * w_obs[c] if c is not None else p_unseen for c in cands])
-    ll = np.empty(len(cands)); ms = np.empty(len(cands)); cums = np.empty(len(cands))
+    ll = np.empty(len(cands)); future_moves = np.empty(len(cands)); past_moves = np.empty(len(cands))
     for i, c in enumerate(cands):
-        Dm = role_design(Xc, secs, c, msec)
-        fit = Dm @ coef
-        cums[i] = fit.sum()
+        role_matrix = role_design(company_paths, secs, c, msec)
+        fit = role_matrix @ coef
+        past_moves[i] = fit.sum()
         ll[i] = -0.5 * ((y - fit) ** 2).sum() / temp
-        fw_roles = role_design(fw[:, None], secs, c, msec)[0]  # (stock, peer, other) forward sums
-        ms[i] = fw_roles @ coef
-    lp = ll + np.log(priors + 1e-300)
-    p = np.exp(lp - lp.max())
+        fw_roles = role_design(future_events[:, None], secs, c, msec)[0]  
+        future_moves[i] = fw_roles @ coef
+    log_prob = ll + np.log(priors + 1e-300)
+    p = np.exp(log_prob - log_prob.max())
     p /= p.sum()
-    m = float(p @ ms)
-    return dict(m=m, cum=float(p @ cums), m_var=float(p @ (ms - m) ** 2), pmax=float(p.max()))
+    m = float(p @ future_moves)
+    return dict(m=m, cum=float(p @ past_moves), m_var=float(p @ (future_moves - m) ** 2), pmax=float(p.max()))
 
-
-# --------------------------------------------------------------------------------------
-# Fitting
-# --------------------------------------------------------------------------------------
 def _wide(df, col, sessions):
     return df.pivot(index="session", columns="bar_ix", values=col).reindex(sessions).to_numpy(float)
 
-
 def prepare_full(bars_long: pd.DataFrame, hl_long: pd.DataFrame):
-    """Arrays for research/fitting from long-format full-session data."""
+
     sessions = np.sort(bars_long.session.unique())
-    D = {"sessions": sessions}
+    sessions_data = {"sessions": sessions}
     for k in ("open", "high", "low", "close"):
-        D[k] = _wide(bars_long, k, sessions)
-    D["lr"] = np.diff(np.concatenate([np.log(D["open"][:, :1]), np.log(D["close"])], axis=1), axis=1)
+        sessions_data[k] = _wide(bars_long, k, sessions)
+    sessions_data["lr"] = np.diff(np.concatenate([np.log(sessions_data["open"][:, :1]), np.log(sessions_data["close"])], axis=1), axis=1)
     hl = hl_long[["session", "bar_ix", "headline"]].copy()
     parsed = [parse_cached(s) for s in hl.headline.values]
     hl["etype"] = [d["etype"] for d in parsed]
@@ -244,96 +193,91 @@ def prepare_full(bars_long: pd.DataFrame, hl_long: pd.DataFrame):
     sidx = {s: i for i, s in enumerate(sessions)}
     hl["si"] = hl.session.map(sidx).astype(int)
     hl = hl.sort_values(["si", "bar_ix"], kind="stable")
-    D["hl_full"] = {si: (g.bar_ix.to_numpy(int), g.etype.to_numpy(), g.company.to_numpy())
-                    for si, g in hl.groupby("si")}
-    D["etypes"] = sorted(hl.etype.unique())
-    return D
+    sessions_data["hl_full"] = {session_id: (g.bar_ix.to_numpy(int), g.etype.to_numpy(), g.company.to_numpy())
+                    for session_id, g in hl.groupby("si")}
+    sessions_data["etypes"] = sorted(hl.etype.unique())
+    return sessions_data
 
-
-def _hl_upto(D, si, max_bar=T0):
-    bars, et, co = D["hl_full"].get(si, (np.array([], int), np.array([]), np.array([])))
+def _hl_upto(sessions_data, session_id, max_bar=T0):
+    bars, event_types, companies = sessions_data["hl_full"].get(session_id, (np.array([], int), np.array([]), np.array([])))
     m = bars <= max_bar
-    return bars[m], et[m], co[m]
+    return bars[m], event_types[m], companies[m]
 
+def fit_base(sessions_data, train_ids, iters=None, naive=False):
 
-def fit_base(D, tr, iters=None, naive=False):
-    """Fit amplitudes, bar means, vol scale, role coefs & priors on training sessions tr."""
     iters = iters or CONFIG["em_iters"]
-    lr = D["lr"][tr]
-    o, h, l, c = (D[k][tr] for k in ("open", "high", "low", "close"))
-    gk = gk_vol(o, h, l, c)
-    c_gk = float(np.median(lr.std(1) / gk))
-    sig = gk * c_gk
-    bm = lr.mean(0)
-    Y = (lr - bm) / sig[:, None]
-    etypes = D["etypes"]
+    returns_by_bar = sessions_data["lr"][train_ids]
+    o, h, l, c = (sessions_data[k][train_ids] for k in ("open", "high", "low", "close"))
+    range_vol = gk_vol(o, h, l, c)
+    c_gk = float(np.median(returns_by_bar.std(1) / range_vol))
+    sig = range_vol * c_gk
+    bm = returns_by_bar.mean(0)
+    Y = (returns_by_bar - bm) / sig[:, None]
+    etypes = sessions_data["etypes"]
     eidx = {e: i for i, e in enumerate(etypes)}
     rows, cols, vals = [], [], []
-    for r_, si in enumerate(tr):
-        bars, et, co = D["hl_full"].get(si, ([], [], []))
-        for b, e in zip(bars, et):
+    for r_, session_id in enumerate(train_ids):
+        bars, event_types, companies = sessions_data["hl_full"].get(session_id, ([], [], []))
+        for b, e in zip(bars, event_types):
             for j in range(NK):
                 if b + j < NBARS:
                     rows.append(r_ * NBARS + b + j); cols.append(eidx[e]); vals.append(KERNEL[j])
-    X = sp.csr_matrix((vals, (rows, cols)), shape=(len(tr) * NBARS, len(etypes)))
+    X = sp.csr_matrix((vals, (rows, cols)), shape=(len(train_ids) * NBARS, len(etypes)))
     Avec = lsqr(X, Y.reshape(-1), atol=1e-12, btol=1e-12)[0]
     A = {e: float(a) for e, a in zip(etypes, Avec)}
     if naive:
         return dict(A=A, bm=bm, c_gk=c_gk, coef=np.ones(3), pri=np.ones(5))
-    # EM for stock identity
+    
     prep = []
-    for r_, si in enumerate(tr):
-        bars, et, co = D["hl_full"].get(si, ([], [], []))
+    for r_, session_id in enumerate(train_ids):
+        bars, event_types, companies = sessions_data["hl_full"].get(session_id, ([], [], []))
         if len(bars) == 0:
             continue
-        order, Xc = company_design(bars, [A[e] for e in et], co, NBARS)
+        order, company_paths = company_design(bars, [A[e] for e in event_types], companies, NBARS)
         secs = [sector(x) for x in order]
-        nsec = np.array([min(sum(1 for s in secs if s == x), 4) for x in secs])
-        prep.append((Y[r_], [role_design(Xc, secs, j) for j in range(len(order))], nsec))
+        sector_counts = np.array([min(sum(1 for s in secs if s == x), 4) for x in secs])
+        prep.append((Y[r_], [role_design(company_paths, secs, j) for j in range(len(order))], sector_counts))
     coef = np.array([2.5, 0.6, 0.3])
     pri = np.ones(5)
     for _ in range(iters):
         XtX = np.zeros((3, 3)); Xty = np.zeros(3); cnt = np.zeros(5); tot = np.zeros(5)
-        for y, Ds, nsec in prep:
-            sse = np.array([((y - Dm @ coef) ** 2).sum() for Dm in Ds])
-            lp = -0.5 * sse + np.log(pri[nsec] / pri[nsec].sum())
-            p = np.exp(lp - lp.max()); p /= p.sum()
-            for pc, Dm in zip(p, Ds):
-                XtX += pc * (Dm.T @ Dm); Xty += pc * (Dm.T @ y)
-            np.add.at(cnt, nsec, p); np.add.at(tot, nsec, 1)
+        for y, Ds, sector_counts in prep:
+            sse = np.array([((y - role_matrix @ coef) ** 2).sum() for role_matrix in Ds])
+            log_prob = -0.5 * sse + np.log(pri[sector_counts] / pri[sector_counts].sum())
+            p = np.exp(log_prob - log_prob.max()); p /= p.sum()
+            for pc, role_matrix in zip(p, Ds):
+                XtX += pc * (role_matrix.T @ role_matrix); Xty += pc * (role_matrix.T @ y)
+            np.add.at(cnt, sector_counts, p); np.add.at(tot, sector_counts, 1)
         coef = np.linalg.solve(XtX, Xty)
         pri = np.where(tot > 0, cnt / np.maximum(tot, 1), 1.0)
         pri = pri / pri[3]
     return dict(A=A, bm=bm, c_gk=c_gk, coef=coef, pri=pri)
 
+def base_features(o, h, l, c, bars, etypes, comps, base_model, temp=None):
 
-def base_features(o, h, l, c, bars, etypes, comps, P, temp=None):
-    """Features at close of bar 49 from bars 0..49 and headlines <=49 only."""
     temp = CONFIG["temp"] if temp is None else temp
     o, h, l, c = (np.asarray(x, float)[: T0 + 1] for x in (o, h, l, c))
-    lr = bar_log_returns(o, c)
-    sig = float(gk_vol(o, h, l, c)) * P["c_gk"]
+    returns_by_bar = bar_log_returns(o, c)
+    sig = float(gk_vol(o, h, l, c)) * base_model["c_gk"]
     sig = max(sig, 1e-6)
-    y = (lr - P["bm"][: T0 + 1]) / sig
+    y = (returns_by_bar - base_model["bm"][: T0 + 1]) / sig
     keep = [i for i, b in enumerate(bars) if b <= T0]
     bars = [int(bars[i]) for i in keep]; etypes = [etypes[i] for i in keep]; comps = [comps[i] for i in keep]
-    s = stock_signal(y, bars, etypes, comps, P["A"], P["coef"], P["pri"], temp=temp)
+    s = stock_signal(y, bars, etypes, comps, base_model["A"], base_model["coef"], base_model["pri"], temp=temp)
     dev = (y.sum() - s["cum"]) / np.sqrt(len(y))
     return dict(m=s["m"], dev=dev, m_var=s["m_var"], pmax=s["pmax"], sig=sig)
 
-
-def features_for(D, idx, P, temp=None):
+def features_for(sessions_data, idx, base_model, temp=None):
     rows = []
-    for si in idx:
-        bars, et, co = _hl_upto(D, si)
-        f = base_features(D["open"][si], D["high"][si], D["low"][si], D["close"][si],
-                          list(bars), list(et), list(co), P, temp=temp)
+    for session_id in idx:
+        bars, event_types, companies = _hl_upto(sessions_data, session_id)
+        f = base_features(sessions_data["open"][session_id], sessions_data["high"][session_id], sessions_data["low"][session_id], sessions_data["close"][session_id],
+                          list(bars), list(event_types), list(companies), base_model, temp=temp)
         rows.append(f)
     return pd.DataFrame(rows, index=idx)
 
-
 def fit_stage2(F, r, cfg=None):
-    """OLS of r/sig on [m, dev]; position = (beta.x)/sig**sig_power, clipped at quantiles."""
+
     cfg = {**CONFIG, **(cfg or {})}
     cols = ["m", "dev"] if cfg["use_dev"] else ["m"]
     X = F[cols].to_numpy(); y = np.asarray(r) / F.sig.to_numpy()
@@ -343,52 +287,43 @@ def fit_stage2(F, r, cfg=None):
     lo, hi = (np.quantile(pos, [q, 1 - q]) if q > 0 else (-np.inf, np.inf))
     return dict(cols=cols, beta=beta, lo=float(lo), hi=float(hi), sig_power=cfg["sig_power"])
 
+def stage2_predict(f, position_fit):
+    x = np.array([f[c] for c in position_fit["cols"]], float)
+    pos = float(x @ position_fit["beta"]) / f["sig"] ** position_fit["sig_power"]
+    return float(np.clip(pos, position_fit["lo"], position_fit["hi"]))
 
-def stage2_predict(f, S):
-    x = np.array([f[c] for c in S["cols"]], float)
-    pos = float(x @ S["beta"]) / f["sig"] ** S["sig_power"]
-    return float(np.clip(pos, S["lo"], S["hi"]))
+def oof_base_features(sessions_data, train_ids, n_inner, seed, temp=None, naive=False):
 
-
-def oof_base_features(D, tr, n_inner, seed, temp=None, naive=False):
-    """Out-of-fold base features for training sessions tr (for fitting stage 2 without leakage)."""
     rng = np.random.RandomState(seed)
-    perm = rng.permutation(tr)
+    perm = rng.permutation(train_ids)
     parts = np.array_split(perm, n_inner)
     out = []
     for part in parts:
-        inner_tr = np.sort(np.setdiff1d(tr, part))
-        P = fit_base(D, inner_tr, naive=naive)
-        out.append(features_for(D, np.sort(part), P, temp=temp))
-    return pd.concat(out).loc[tr]
+        inner_tr = np.sort(np.setdiff1d(train_ids, part))
+        base_model = fit_base(sessions_data, inner_tr, naive=naive)
+        out.append(features_for(sessions_data, np.sort(part), base_model, temp=temp))
+    return pd.concat(out).loc[train_ids]
 
-
-def train(D, r, tr=None, cfg=None):
+def train(sessions_data, r, train_ids=None, cfg=None):
     cfg = {**CONFIG, **(cfg or {})}
-    tr = np.arange(len(D["sessions"])) if tr is None else np.asarray(tr)
-    F = oof_base_features(D, tr, cfg["n_inner"], cfg["seed"], temp=cfg["temp"], naive=cfg["naive"])
-    S = fit_stage2(F, r[tr], cfg)
-    P = fit_base(D, tr, naive=cfg["naive"])
-    return dict(P=P, S=S, cfg=cfg)
+    train_ids = np.arange(len(sessions_data["sessions"])) if train_ids is None else np.asarray(train_ids)
+    F = oof_base_features(sessions_data, train_ids, cfg["n_inner"], cfg["seed"], temp=cfg["temp"], naive=cfg["naive"])
+    position_fit = fit_stage2(F, r[train_ids], cfg)
+    base_model = fit_base(sessions_data, train_ids, naive=cfg["naive"])
+    return dict(base_model=base_model, position_fit=position_fit, cfg=cfg)
 
-
-def predict_session(M, o, h, l, c, headlines, headline_bars):
-    bars, et, co = [], [], []
+def predict_session(trained_model, o, h, l, c, headlines, headline_bars):
+    bars, event_types, companies = [], [], []
     for hdl, b in zip(headlines, headline_bars):
         if b is None or not np.isfinite(b) or b > T0:
             continue
         d = parse_cached(hdl)
-        bars.append(int(b)); et.append(d["etype"]); co.append(d["company"])
-    f = base_features(o, h, l, c, bars, et, co, M["P"], temp=M["cfg"]["temp"])
-    return stage2_predict(f, M["S"])
+        bars.append(int(b)); event_types.append(d["etype"]); companies.append(d["company"])
+    f = base_features(o, h, l, c, bars, event_types, companies, trained_model["P"], temp=trained_model["cfg"]["temp"])
+    return stage2_predict(f, trained_model["S"])
 
-
-# --------------------------------------------------------------------------------------
-# Train on all in-sample data and expose my_prediction
-# --------------------------------------------------------------------------------------
 _MODEL = None
 _CACHE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "model_params.pkl")
-
 
 def get_model(use_cache=True):
     global _MODEL
@@ -401,11 +336,11 @@ def get_model(use_cache=True):
             _MODEL = obj["model"]
             return _MODEL
     import sessions
-    D = prepare_full(sessions.get_ins_full_bars(), sessions.get_ins_full_headlines())
+    sessions_data = prepare_full(sessions.get_ins_full_bars(), sessions.get_ins_full_headlines())
     rets = pd.read_parquet(os.path.join(os.path.dirname(os.path.abspath(sessions.__file__)),
                                         "ins_returns.parquet")).set_index("session").returns
-    r = rets.reindex(D["sessions"]).to_numpy(float)
-    _MODEL = train(D, r)
+    r = rets.reindex(sessions_data["sessions"]).to_numpy(float)
+    _MODEL = train(sessions_data, r)
     try:
         with open(_CACHE, "wb") as fh:
             pickle.dump({"config": CONFIG, "model": _MODEL}, fh)
@@ -413,20 +348,18 @@ def get_model(use_cache=True):
         pass
     return _MODEL
 
-
 def my_prediction(row: pd.Series) -> float:
     try:
-        M = get_model()
-        v = predict_session(M, row["open"], row["high"], row["low"], row["close"],
+        trained_model = get_model()
+        v = predict_session(trained_model, row["open"], row["high"], row["low"], row["close"],
                             list(row["headlines"]), list(row["headline_bars"]))
         return v if np.isfinite(v) else 0.0
     except Exception:
         return 0.0
 
-
 if __name__ == "__main__":
     import sessions
-    M = get_model(use_cache=False)
-    print("role coefs", M["P"]["coef"], "stage2", M["S"])
+    trained_model = get_model(use_cache=False)
+    print("role coefs", trained_model["P"]["coef"], "stage2", trained_model["S"])
     print(sessions.run_ins_backtest(my_prediction))
     sessions.write_submission(prediction_df=sessions.get_oos_predictions(my_prediction), path="predictions.csv")
