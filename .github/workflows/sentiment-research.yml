@@ -24,6 +24,15 @@ jobs:
           cache: pip
       - run: python -m pip install -r requirements.txt
       - run: python -m pytest -q
+      - name: Inspect representative competition headlines
+        run: |
+          python - <<'PY'
+          import sessions
+          data = sessions.get_ins_data()
+          print("Headline samples and their release bars:")
+          for i, (_, row) in enumerate(data.iloc[:12].iterrows(), 1):
+              print(i, list(zip(row["headline_bars"], row["headlines"]))[:4])
+          PY
       - name: Evaluate on official labelled parquet data
         run: python algoarena_sentiment_v4.py --no-submission --output-dir runs/github-validation
       - name: Print measured Sharpes
