@@ -310,7 +310,7 @@ def train(sessions_data, r, train_ids=None, cfg=None):
     F = oof_base_features(sessions_data, train_ids, cfg["n_inner"], cfg["seed"], temp=cfg["temp"], naive=cfg["naive"])
     position_fit = fit_stage2(F, r[train_ids], cfg)
     base_model = fit_base(sessions_data, train_ids, naive=cfg["naive"])
-    return dict(base_model=base_model, position_fit=position_fit, cfg=cfg)
+    return {"P": base_model, "S": position_fit, "cfg": cfg}
 
 def predict_session(trained_model, o, h, l, c, headlines, headline_bars):
     bars, event_types, companies = [], [], []
