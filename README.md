@@ -10,53 +10,55 @@ At the close of bar 49, predict the **market-adjusted close-49 to close-59 retur
 
 Permitted inputs are only bars 0-49 (`open`, `high`, `low`, `close`) and `headlines` with `headline_bars` in that range. No future bars, future headlines, or out-of-sample labels are used.
 
-## 1. Add the organiser's data
+## 1. Competition files are already here
 
-Put the competition's files together in `data/` (or pass a different directory using `--data-dir`):
+The organiser's files are committed at the root of this repository, alongside the model:
 
 ```text
 HRT-Game/
 ├── algoarena_sharpe_v3.py
-├── data/                   # local only, ignored by git
-│   ├── sessions.py
-│   ├── ins_*.parquet
-│   └── oos_*.parquet
+├── sessions.py
+├── ins_bars.parquet
+├── ins_headlines.parquet
+├── ins_returns.parquet
+├── oos_bars.parquet
+├── oos_headlines.parquet
 ├── notebooks/AlgoArena_v3.ipynb
-├── tests/test_smoke.py
-└── runs/                   # logs/reports, ignored by git
+└── tests/test_smoke.py
 ```
 
-Use the source link provided in the competition notebook to obtain these files:
+Use `git pull --ff-only origin main` if already cloned, then run:
 
 ```bash
 python -m pip install -r requirements.txt
-python -m gdown --folder 'https://drive.google.com/drive/folders/1mYOtE9R-XtdcJ4cPVpQYAxiPLD1Dm4vX?usp=sharing' --output data
+python algoarena_sharpe_v3.py --check-data
+python algoarena_sharpe_v3.py
 ```
 
-If you already downloaded them, just copy them into `data/`. **They are not included in this repository.** Large data and prediction files should not be committed.
+No separate download or `data/` directory is required. To use another location, pass `--data-dir PATH`. Keep all five parquet files together with `sessions.py`.
 
 ## 2. Run the first experiment
 
 ```bash
 python algoarena_sharpe_v3.py --check-data
-python algoarena_sharpe_v3.py --data-dir data
+python algoarena_sharpe_v3.py
 ```
 
 Run a validation-only experiment without generating the out-of-sample CSV:
 
 ```bash
-python algoarena_sharpe_v3.py --data-dir data --no-submission
+python algoarena_sharpe_v3.py --no-submission
 ```
 
 To name your run:
 
 ```bash
-python algoarena_sharpe_v3.py --data-dir data --output-dir runs/experiment_01
+python algoarena_sharpe_v3.py --output-dir runs/experiment_01
 ```
 
 By default, every run uses a **new timestamped folder** under `runs/` so historical diagnostics are preserved. `predictions.csv` is generated at the repository root for manual competition upload. **Creating the CSV does not spend one of the 10 submissions.**
 
-You can also run [`notebooks/AlgoArena_v3.ipynb`](notebooks/AlgoArena_v3.ipynb) in Colab. It installs requirements, clones this repository, and downloads data from the competition-provided folder.
+You can also run [`notebooks/AlgoArena_v3.ipynb`](notebooks/AlgoArena_v3.ipynb) in Colab. It installs requirements, clones this repository, and uses data already in this repository.
 
 ## 3. Understand the output
 
