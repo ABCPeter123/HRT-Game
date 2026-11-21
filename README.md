@@ -98,3 +98,27 @@ python -m pytest -q
 Tests use **synthetic fixtures only**, verify the interface and output format, and cannot establish performance on the actual competition dataset.
 
 Read [`docs/EXPERIMENT_PROTOCOL.md`](docs/EXPERIMENT_PROTOCOL.md) for the fuller evaluation protocol.
+## Headline sentiment model (v4)
+
+This version adds a transparent financial-news sentiment score, recency-weighted
+headline features, learned word/phrase n-grams and character n-grams. Instead of
+assuming news helps, the model compares **price-only**, **sentiment-only** and
+**combined** signals on the same three validation folds, choosing by stability-
+adjusted Sharpe. The final 20% labelled audit remains outside model selection.
+
+```bash
+python -m pip install -r requirements.txt
+python algoarena_sentiment_v4.py
+```
+
+The new script prints fold Sharpe, model-family ablations, final audit Sharpe,
+bootstrap confidence interval, drawdown and top learned words. It creates
+`predictions.csv` with the competition's official `sessions.write_submission`
+function and saves all reports under `runs/`. Creating the CSV does not use
+a leaderboard upload. A GitHub Actions workflow runs the model on the committed
+labelled data and saves diagnostics, without submitting predictions.
+
+The target Sharpe is **3.65**. It is a research target, not an assumed result.
+Strong validation alone does not establish hidden out-of-sample performance.
+
+Colab users can open `notebooks/AlgoArena_Sentiment_v4.ipynb`.
