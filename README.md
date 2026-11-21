@@ -125,3 +125,34 @@ Colab users can open `notebooks/AlgoArena_Sentiment_v4.ipynb`.
 
 The short, readable entry point for the final CSV is `python make_submission.py`.
 It calls the validated v4 pipeline and writes `predictions.csv`; it does not upload it.
+
+### Measured model comparison on 10,000 labelled sessions
+
+| Experiment | Three-fold validation Sharpe | Exploratory audit Sharpe |
+|---|---:|---:|
+| v4 finance dictionary + TF-IDF | 2.053 | 2.042 |
+| **v5 structured news + numeric financial surprises** | **2.375** | **2.470** |
+| v6 repeated-company relevance | 2.243 | 2.279 |
+
+The v5 experiment is the selected model, based on its higher validation Sharpe.
+The audit values are exploratory diagnostics, not official hidden-out-of-sample
+results. Subsequent experimentation against these same audit observations does
+not constitute a fresh sealed test.
+
+**Recommended commands:**
+
+```bash
+git pull --ff-only origin main
+python -m pip install -r requirements.txt
+python make_submission.py
+```
+
+Use [notebooks/AlgoArena_Sentiment_v5.ipynb](notebooks/AlgoArena_Sentiment_v5.ipynb)
+for Google Colab. The short `make_submission.py` file calls the validated v5
+pipeline, produces `predictions.csv`, and prints validation/audit Sharpe. It
+does not upload to AlgoArena. Each run retains a timestamped diagnostics
+folder. Do not use one of the limited official uploads solely because the CSV
+exists.
+
+**3.65 Sharpe remains a target.** The best exploratory audit reached 2.470.
+The official hidden-test Sharpe is unknown.
