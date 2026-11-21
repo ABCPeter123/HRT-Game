@@ -5,6 +5,7 @@ on:
     paths:
       - 'algoarena_sentiment_v4.py'
       - 'algoarena_sentiment_v5.py'
+      - 'algoarena_sentiment_v6.py'
       - 'algoarena_sharpe_v3.py'
       - 'requirements.txt'
       - '.github/workflows/sentiment-research.yml'
@@ -38,6 +39,8 @@ jobs:
         run: python algoarena_sentiment_v4.py --no-submission --output-dir runs/github-validation
       - name: Test structured headlines on the same labelled data
         run: python algoarena_sentiment_v5.py --no-submission --output-dir runs/github-v5
+      - name: Test company-aware headline selection
+        run: python algoarena_sentiment_v6.py --no-submission --output-dir runs/github-v6
       - name: Print measured Sharpes
         if: success()
         run: |
@@ -52,6 +55,10 @@ jobs:
           print("v5 validation:",v5["selection"]["oof_sharpe"])
           print("v5 exploratory audit:",v5["audit"]["sharpe"])
           print("v5 minus v4 validation:",v5["selection"]["oof_sharpe"]-r["selection"]["oof_sharpe"])
+          v6=json.load(open("runs/github-v6/report.json"))
+          print("v6 validation:",v6["selection"]["oof_sharpe"])
+          print("v6 exploratory audit:",v6["audit"]["sharpe"])
+          print("v6 minus v4 validation:",v6["selection"]["oof_sharpe"]-r["selection"]["oof_sharpe"])
           PY
       - name: Save reports
         if: always()
@@ -61,5 +68,6 @@ jobs:
           path: |
             runs/github-validation/
             runs/github-v5/
+            runs/github-v6/
           if-no-files-found: warn
           retention-days: 14
