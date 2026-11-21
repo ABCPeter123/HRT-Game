@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'algoarena_sentiment_v4.py'
+      - 'algoarena_sentiment_v5.py'
       - 'algoarena_sharpe_v3.py'
       - 'requirements.txt'
       - '.github/workflows/sentiment-research.yml'
@@ -35,6 +36,8 @@ jobs:
           PY
       - name: Evaluate on official labelled parquet data
         run: python algoarena_sentiment_v4.py --no-submission --output-dir runs/github-validation
+      - name: Test structured headlines on the same labelled data
+        run: python algoarena_sentiment_v5.py --no-submission --output-dir runs/github-v5
       - name: Print measured Sharpes
         if: success()
         run: |
@@ -45,12 +48,18 @@ jobs:
           print("Audit Sharpe:",r["audit"]["sharpe"])
           print("Audit minus target:",r["audit"]["sharpe"]-3.65)
           print("Signal:",r["selection"]["kind"])
+          v5=json.load(open("runs/github-v5/report.json"))
+          print("v5 validation:",v5["selection"]["oof_sharpe"])
+          print("v5 exploratory audit:",v5["audit"]["sharpe"])
+          print("v5 minus v4 validation:",v5["selection"]["oof_sharpe"]-r["selection"]["oof_sharpe"])
           PY
       - name: Save reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: sentiment-debug
-          path: runs/github-validation/
+          path: |
+            runs/github-validation/
+            runs/github-v5/
           if-no-files-found: warn
           retention-days: 14
