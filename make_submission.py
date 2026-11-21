@@ -8,7 +8,7 @@ No leaderboard upload happens automatically.
 """
 from pathlib import Path
 
-from algoarena_sentiment_v4 import run_pipeline
+from algoarena_sentiment_v5 import run_pipeline
 
 
 def main():
