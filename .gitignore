@@ -19,3 +19,6 @@ venv/
 .env
 .env.*
 .DS_Store
+
+model_params.pkl
+predictions_blend.csv
