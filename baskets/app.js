@@ -346,7 +346,12 @@ async function pollBridge(){
     }
     const age=(result.ageMs/1000).toFixed(1);
     const host=result.snapshot.host||"game page";
-    updateBridgeUI("CAPTURING","Data from "+host+" · "+age+"s old. Prices and mapped positions refresh automatically.",true);
+    const reported=Object.keys(result.snapshot.books||{});
+    const missing=SYMBOLS.filter(s=>!reported.includes(s));
+    updateBridgeUI("CAPTURING",
+      "Data from "+host+" · "+age+"s old · Updated: "+(reported.join(", ")||"none")+
+      (missing.length?" · Not updated: "+missing.join(", ")+" (last recorded values retained).":""),
+      true);
     if(result.seq!==bridgeSequence){
       bridgeSequence=result.seq;
       applyMarketData(result.snapshot,"bridge");

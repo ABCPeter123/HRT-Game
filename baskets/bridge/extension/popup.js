@@ -62,6 +62,7 @@ async function previewField(row,{saveFirst=true}={}){
    row.preview.textContent="Not mapped";row.preview.className="field-preview";return false;
  }
  const result=await send({type:"PREVIEW",tabId:tab.id,rule});
+ row.lastPreview=result;
  const vals=(result.values||[]).slice(0,14)
    .map((v,i)=>(i+1)+":"+v).join(" | ");
  const suffix=" ("+(result.elements??0)+" matching element"+(result.elements===1?"":"s")+")";
@@ -168,14 +169,19 @@ $("start").addEventListener("click",async()=>{
  const key=$("bridgeKey").value.trim().toLowerCase();
  if(!/^[0-9a-f]{36}$/.test(key)){status("Save the bridge key before starting.");return;}
  await chrome.storage.local.set({bridgeKey:key});
- let pairs=0,invalid=0;
+ let pairs=0,invalid=0,hidden=0;
  for(const sym of SYMBOLS){
    const bid=rows.get(entry(sym,"bid")),ask=rows.get(entry(sym,"ask"));
    if(!bid.selector.value.trim()&&!ask.selector.value.trim())continue;
    if(!bid.selector.value.trim()||!ask.selector.value.trim()){invalid++;continue;}
    const b=await previewField(bid),a=await previewField(ask);
    if(b&&a&&bid.currentValue<ask.currentValue)pairs++;
-   else{
+   else if(!b&&!a&&bid.lastPreview?.error==="No visible matches"&&
+     ask.lastPreview?.error==="No visible matches"){
+     // A game may show only one basket book at a time. The other mapped books
+     // can become visible later, without blocking capture of the active one.
+     hidden++;
+   }else{
      invalid++;
      if(b&&a){
        status("Bid must be below ask for "+sym+". Recheck numeric indices.");
@@ -188,7 +194,7 @@ $("start").addEventListener("click",async()=>{
    status("Resolve invalid or ambiguous bid/ask mappings first. Need at least one verified pair.");return;
  }
  const result=await send({type:"START",tabId:tab.id});
- status(result.ok?"Read-only capture active. Confirm values in Baskets panel.":
+ status(result.ok?"Read-only capture active. "+(hidden?hidden+" mapped books currently hidden. ":"")+"Confirm values in Baskets panel.":
    result.error||"Capture failed.",result.ok);
 });
 $("stop").addEventListener("click",async()=>{
