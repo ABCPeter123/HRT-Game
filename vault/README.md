@@ -10,7 +10,7 @@ Run tests: cd vault, then npm test. No paid APIs, backend, or Vercel deployment 
 
 ## One-tap chip entry
 
-The Read chips stage has an **ENTER CHIP DATA WITH BUTTONS** keypad. Select the partial, exact, combo A, combo B, or mean field, then tap a number. For combo references, choose the ID from 1–30; for values, choose 1–10. **Unknown / clear** removes the selected value. Use **Save & next chip →** for the fastest reveal sequence. Numeric fields and the optional `ID:partial/true` batch import remain available as fallbacks. Pressing a numeric key only populates the local form; no chip state or valuation is changed until saving.
+The Read chips stage has an **ENTER CHIP DATA WITH BUTTONS** keypad. First tap Partial number, Exact value only, or Combination, then select the partial, exact, combo A, combo B, or mean field and tap a number. For combo references, choose the ID from 1–30; for values, choose 1–10. **Unknown / clear** removes the selected value. Use **Save & next chip →** for the fastest reveal sequence. Numeric fields and the optional `ID:partial/true` batch import remain available as fallbacks. Pressing a numeric key only populates the local form; no chip state or valuation is changed until saving.
 
 ## Fast workflow
 
