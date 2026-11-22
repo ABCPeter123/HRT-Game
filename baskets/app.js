@@ -7,6 +7,12 @@ import {parseMarketText,mergeMarketSnapshot} from "./import.js";
 
 const $=id=>document.getElementById(id);
 const KEY="quant-comp-baskets-v1";
+document.getElementById("reset-game").addEventListener("click",()=>{
+  if(!window.confirm("Reset ALL Baskets data? This permanently erases all three rounds, books, event observations, fills and saved settings. This cannot be undone."))return;
+  try{localStorage.removeItem(KEY);}
+  catch{window.alert("Could not clear saved data. Reset cancelled.");return;}
+  window.location.reload();
+});
 const LABELS={GRID:"TEK + NRG",CURE:"TEK + MED",SAFE:"NRG + MED"};
 const GUIDE={
   bid:"Highest visible offer to BUY in the selected basket orderbook. Enter the price, not its size. Tick $0.50, range $0–$800.",
