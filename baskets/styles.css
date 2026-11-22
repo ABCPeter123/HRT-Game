@@ -158,7 +158,7 @@ a.manual-callout-button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .quick-report select:disabled{opacity:.6}
 .quick-report .desk-label,.quick-fill-fields>label{display:block;color:#dcefe8;font-size:12px;font-weight:720;margin-top:9px}
 .quick-status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:12px}
-.quick-status-button{min-height:47px;cursor:pointer;border:1px solid #48666f;background:#192e3e;color:#e3f2f6;border-radius:8px;font:700 12px/1.3 inherit;padding:10px 6px}
+.quick-status-button{min-height:47px;cursor:pointer;border:1px solid #48666f;background:#192e3e;color:#e3f2f6;border-radius:8px;font-family:inherit;font-size:12px;font-weight:700;line-height:1.3;padding:10px 6px}
 .quick-status-button:hover:not(:disabled){border-color:#7cebd1;background:#24554b}
 .quick-status-button.selected{background:#26785f;color:white;border-color:#86f8d6}
 .quick-status-button:disabled{opacity:.4;cursor:not-allowed}
