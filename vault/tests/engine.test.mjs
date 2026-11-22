@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {SYMBOLS,roleForRound,newChips,validateChip,errorLikelihood,numericLikelihood,
  roundedMean,revealSchedule,chipPosterior,validPrice,bookStatus,capacity,makerPenalty,
- defaultBook,defaultRound,suggest,applyFill,markedPnl} from "../engine.js";
+ defaultBook,defaultRound,suggest,recommend,applyFill,markedPnl} from "../engine.js";
 import {sanitizeMarketSnapshot,mergeMarketSnapshot} from "../import.js";
 const close=(x,y,eps=1e-7)=>assert.ok(Math.abs(x-y)<eps, String(x)+" != "+String(y));
 
@@ -141,4 +141,26 @@ test("fresh round covers all chips and symbols",()=>{
  const round=defaultRound("taker");
  assert.equal(round.chips.length,30);
  assert.deepEqual(Object.keys(round.books),SYMBOLS);
+});
+
+test("maker action prioritizes restoring qualifying two-way quotes over a profitable taker order",()=>{
+ const m=chipPosterior(newChips());
+ const books={VAULT:{...defaultBook(),bid:140,ask:141,bidSize:100,askSize:100},
+   G5:defaultBook(),PUB:defaultBook()};
+ const choice=recommend(m,books,{role:"maker",maxOrder:30,elapsed:100});
+ assert.equal(choice.best?.kind,"QUOTE");
+ assert.ok(["VAULT","G5","PUB"].includes(choice.best?.symbol));
+ const t=recommend(m,books,{role:"taker",maxOrder:30,elapsed:100});
+ assert.equal(t.best?.kind,"IOC");
+});
+test("maker width rate retains sub-cent precision for the round timer",()=>{
+ const b={...defaultBook(),ownBid:"140",ownAsk:"151",ownBidSize:20,ownAskSize:20};
+ const rate=makerPenalty("VAULT",b,10.33,{elapsed:50}).rate;
+ close(rate,.01*.67,1e-8);
+});
+test("each Vault round keeps distinct maker quote fill timestamp slots",()=>{
+ const row=defaultRound("maker");
+ assert.deepEqual(Object.keys(row.lastQuoteFillAt),SYMBOLS);
+ row.lastQuoteFillAt.G5=90;
+ assert.equal(row.lastQuoteFillAt.VAULT,-Infinity);
 });
