@@ -23,6 +23,18 @@ button:disabled{opacity:.45}button:hover{filter:brightness(1.1)}
 .option-control{display:block;font-size:10px;color:#8ea5bc}
 .option-control input{margin-top:3px;min-height:27px}
 .mapping-options button{height:28px}
+.mapping-lock{grid-column:1/-1;margin-top:7px;padding:7px;background:#102b2d;
+ border:1px solid #295858;border-radius:6px}
+.lock-label{display:flex;align-items:center;gap:8px;color:#79dec5;font-size:11px;font-weight:760;cursor:pointer}
+.lock-label input{width:15px;height:15px;accent-color:#71dfc4}
+.lock-inputs{display:grid;grid-template-columns:1.2fr 1fr;gap:8px;margin-top:9px}
+.lock-inputs[hidden]{display:none}
+.lock-inputs select{display:block;width:100%;height:30px;margin-top:3px;background:#142f36;
+ border:1px solid #47746e;border-radius:6px;color:#ebf5f2;font-size:11px;padding:5px}
+.legacy-disabled{opacity:.45}
+.mapping-row{align-items:start}
+.mapping-row>strong,.mapping-row>label{padding-top:10px}
+
 .field-preview{grid-column:1/-1;font-size:11px;color:#93a8b9;margin-top:5px;overflow-wrap:anywhere}
 .section{border-top:1px solid #293949;padding-top:11px;margin-top:13px}
 details{margin-top:12px}summary{color:#71dfc4;cursor:pointer}
@@ -36,10 +48,11 @@ details{margin-top:12px}summary{color:#71dfc4;cursor:pointer}
 <div class="row"><input type="password" id="bridgeKey" autocomplete="off" placeholder="36-character bridge key"><button id="saveKey">Save key</button></div>
 <div id="status">Checking bridge...</div></div>
 <div class="section"><h2>2. Map and verify actual values</h2>
-<p>Click <strong>Pick</strong> then click the relevant price in the game. Click <strong>Check</strong> to preview the number extracted. If the element contains several numbers, enter <strong>Number #</strong> (1 = first). If a CSS selector matches several rows, enter <strong>Element #</strong>.</p>
+<p><strong>New:</strong> The picker attempts to lock the value to its named basket, even if instrument rows move. For existing mappings, enable <strong>Follow GRID/CURE/SAFE dynamically</strong> and enter a Row CSS selector such as <code>tr</code> or <code>.quote-row</code>. Choose <strong>Label or table heading</strong> to follow bid/ask fields when their columns also move. Click <strong>Check</strong> before starting.</p>
+<p>Legacy Element # and Number # remain available when the game has no readable symbol or labels, but they are not reorder-safe.</p>
 <div id="essential" class="mapping"></div>
 <details><summary>Optional sizes, positions and working orders</summary><div id="advanced" class="mapping"></div></details>
-<p class="note">For numbers in an element's attribute, enter its name in <strong>Attribute</strong>, such as <code>aria-label</code> or <code>data-price</code>. Leave both index fields empty when only one value exists.</p>
+<p class="note">The new symbol lock re-discovers the row on every capture. You can read a labeled value, match the current table column heading, or use a CSS selector <em>within</em> the matched row. For an attribute-backed field choose <strong>CSS selector within row</strong> and provide its attribute name (for example <code>data-price</code>). Row matches that are missing or duplicated fail safely without importing a number.</p>
 <div class="row"><button id="checkAll">Check all six bid/ask fields</button></div>
 </div>
 <div class="section"><h2>3. Start read-only capture</h2>

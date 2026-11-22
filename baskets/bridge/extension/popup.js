@@ -32,7 +32,15 @@ function input(label,value,type,placeholder){
 function draftFromUI(row){
  const selector=row.selector.value.trim();
  const attribute=row.attr.value.trim();
- if(attribute&&!ATTR.test(attribute))throw new Error("Attribute must be aria-*, data-*, title or content");
+ if(attribute&&!ATTR.test(attribute))
+   throw new Error("Attribute must be aria-*, data-*, title or content");
+ if(row.lock.checked){
+   if(row.method.value==="selector"&&!selector)
+     throw new Error("Enter a CSS selector within the matched "+row.sym+" row.");
+   return {mode:"symbol",symbol:row.sym,field:row.field,
+     rowSelector:row.rowSelector.value.trim(),source:row.method.value,selector,
+     ...(attribute?{attribute}:{})};
+ }
  const convert=(input,max)=>{
    if(input.value.trim()==="")return undefined;
    const n=Number(input.value);
@@ -58,10 +66,10 @@ async function previewField(row,{saveFirst=true}={}){
  if(saveFirst && !(await saveField(row)))return false;
  let rule;
  try{rule=draftFromUI(row);}catch(error){row.preview.textContent=error.message;return false;}
- if(!rule.selector){
+ if(!rule.selector && rule.mode!=="symbol"){
    row.preview.textContent="Not mapped";row.preview.className="field-preview";return false;
  }
- const result=await send({type:"PREVIEW",tabId:tab.id,rule});
+ const result=await send({type:"PREVIEW",tabId:tab.id,rule,sym:row.sym,field:row.field});
  row.lastPreview=result;
  const vals=(result.values||[]).slice(0,14)
    .map((v,i)=>(i+1)+":"+v).join(" | ");
@@ -78,7 +86,7 @@ async function previewField(row,{saveFirst=true}={}){
      delete row.currentValue;return false;
    }
    row.currentValue=v;
-   row.preview.textContent="Reads "+result.value+suffix+
+   row.preview.textContent=(result.mode==="symbol"?"LOCKED "+row.sym+" "+row.field+" · ":"")+"Reads "+result.value+suffix+
      (result.values.length>1?" · Values: "+vals:"");
    row.preview.className="field-preview ok";
    return true;
@@ -108,9 +116,45 @@ function buildRow(sym,field){
  const attr=input("Attribute",rule.attribute||"","text","e.g. data-price");
  const check=document.createElement("button");check.textContent="Check";
  extra.append(element.wrap,number.wrap,attr.wrap,check);
+ const lockPanel=document.createElement("div");lockPanel.className="mapping-lock";
+ const lockLabel=document.createElement("label");lockLabel.className="lock-label";
+ const lock=document.createElement("input");lock.type="checkbox";lock.checked=rule.mode==="symbol";
+ lockLabel.append(lock,document.createTextNode(" Follow "+sym+" dynamically (ignores row order)"));
+ const rowCss=input("Row CSS selector",rule.rowSelector||"","text",
+   "tr, [role=row], .quote-row");
+ const modeLabel=document.createElement("label");modeLabel.className="option-control";
+ modeLabel.textContent="Find field using";
+ const method=document.createElement("select");
+ for(const [key,name] of [["auto","Label or table heading"],["label","Labeled value"],["header","Table column heading"],["selector","CSS selector within row"]]){
+   const option=document.createElement("option");option.value=key;option.textContent=name;
+   method.append(option);
+ }
+ method.value=rule.source||"auto";modeLabel.append(method);
+ const lockInputs=document.createElement("div");lockInputs.className="lock-inputs";
+ lockInputs.append(rowCss.wrap,modeLabel);
+ lockPanel.append(lockLabel,lockInputs);
  const preview=document.createElement("div");preview.className="field-preview";
  preview.textContent="Preview not checked";
- const row={sym,field,selector,element:element.el,number:number.el,attr:attr.el,preview};
+ const row={sym,field,selector,element:element.el,number:number.el,attr:attr.el,preview,
+   lock,rowSelector:rowCss.el,method};
+ function sync(){
+   const dynamic=lock.checked;
+   lockInputs.hidden=!dynamic;
+   row.element.disabled=dynamic;row.number.disabled=dynamic;
+   row.selector.disabled=dynamic&&method.value!=="selector";
+   row.selector.placeholder=dynamic?
+     (method.value==="selector"?"CSS selector INSIDE the "+sym+" row":"Not needed for label/header mode"):
+     "Legacy CSS selector";
+   extra.classList.toggle("legacy-disabled",dynamic);
+ }
+ sync();
+ lock.addEventListener("change",()=>{
+   sync();saveField(row).then(ok=>{if(ok)previewField(row,{saveFirst:false});});
+ });
+ method.addEventListener("change",()=>{
+   sync();saveField(row).then(ok=>{if(ok)previewField(row,{saveFirst:false});});
+ });
+ rowCss.el.addEventListener("change",()=>saveField(row).then(ok=>{if(ok)previewField(row,{saveFirst:false});}));
  for(const el of [selector,element.el,number.el,attr.el]){
    el.addEventListener("change",()=>saveField(row).then(ok=>{if(ok)previewField(row,{saveFirst:false});}));
  }
@@ -120,7 +164,7 @@ function buildRow(sym,field){
    window.close();
  });
  check.addEventListener("click",()=>previewField(row));
- item.append(name,label,selector,pick,extra,preview);
+ item.append(name,label,selector,pick,lockPanel,extra,preview);
  rows.set(entry(sym,field),row);
  return item;
 }
@@ -157,7 +201,7 @@ $("checkAll").addEventListener("click",async()=>{
  for(const sym of SYMBOLS){
    for(const field of ESSENTIAL){
      const row=rows.get(entry(sym,field));
-     if(!row.selector.value.trim())continue;
+     if(!row.lock.checked&&!row.selector.value.trim())continue;
      configured++;
      if(await previewField(row))valid++;
    }
@@ -172,12 +216,15 @@ $("start").addEventListener("click",async()=>{
  let pairs=0,invalid=0,hidden=0;
  for(const sym of SYMBOLS){
    const bid=rows.get(entry(sym,"bid")),ask=rows.get(entry(sym,"ask"));
-   if(!bid.selector.value.trim()&&!ask.selector.value.trim())continue;
-   if(!bid.selector.value.trim()||!ask.selector.value.trim()){invalid++;continue;}
+   const hasBid=bid.lock.checked||!!bid.selector.value.trim();
+   const hasAsk=ask.lock.checked||!!ask.selector.value.trim();
+   if(!hasBid&&!hasAsk)continue;
+   if(!hasBid||!hasAsk){invalid++;continue;}
    const b=await previewField(bid),a=await previewField(ask);
    if(b&&a&&bid.currentValue<ask.currentValue)pairs++;
-   else if(!b&&!a&&bid.lastPreview?.error==="No visible matches"&&
-     ask.lastPreview?.error==="No visible matches"){
+   else if(!b&&!a&&
+     ["No visible matches","No visible row uniquely identifies "+sym+"."].includes(bid.lastPreview?.error)&&
+     ["No visible matches","No visible row uniquely identifies "+sym+"."].includes(ask.lastPreview?.error)){
      // A game may show only one basket book at a time. The other mapped books
      // can become visible later, without blocking capture of the active one.
      hidden++;

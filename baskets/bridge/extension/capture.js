@@ -24,7 +24,7 @@ function capture(){
    for(const field of FIELDS){
      const rule=mapping?.[sym]?.[field];
      if(!rule)continue;
-     const result=extract.preview(rule);
+     const result=extract.preview(rule,document,{sym,field});
      if(result.ok&&valid(field,result.value))fields[field]=result.value;
    }
    if(Object.keys(fields).length)books[sym]=fields;
@@ -106,15 +106,20 @@ function beginPick(sym,field){
    event.preventDefault();
    event.stopImmediatePropagation(); // Picking never triggers a game trade.
    const element=event.target instanceof Element?event.target:null;
-   const selector=element?cssPath(element):null;
+   const suggestion=element?.getRootNode()===document?
+     extract.suggestSymbolRule(element,sym,field,document):null;
+   const fallback=element?cssPath(element):null;
    cancelPick();
-   if(!selector){
-     const reason=element?.getRootNode()===document?
-       "This element lacks a stable DOM path. Try an adjacent parent or a manual CSS selector.":
-       "The value is inside shadow DOM or a frame; a dedicated adapter is required.";
-     alert("Baskets reader: "+reason);return;
+   if(!suggestion?.rule && !fallback){
+     alert("Baskets reader: Cannot identify an accessible HTML field. Try a visible value or manual dynamic row selector.");return;
    }
-   chrome.runtime.sendMessage({type:"FIELD_PICKED",sym,field,rule:{selector}},
+   if(!suggestion?.rule){
+     alert("Symbol lock could not be configured automatically. The picker saved a legacy position-based selector. Switch to Follow symbol and supply a Row CSS selector to make it reorder-safe.");
+   }else if(!suggestion.verified){
+     alert("The "+sym+" row is locked by symbol, but this field needs a matching label, table header, or scoped Field CSS selector. Open the extension and click Check.");
+   }
+   chrome.runtime.sendMessage({type:"FIELD_PICKED",sym,field,
+     rule:suggestion?.rule||{selector:fallback}},
      ()=>void chrome.runtime.lastError);
  };
  pick.key=event=>{if(event.key==="Escape"){event.preventDefault();cancelPick();}};
@@ -138,7 +143,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
    beginPick(message.sym,message.field);reply({ok:true});return;
  }
  if(message?.type==="PREVIEW"){
-   const result=extract.preview(message.rule);
+   const result=extract.preview(message.rule,document,{sym:message.sym,field:message.field});
    reply(result);return;
  }
  if(message?.type==="STOP"){

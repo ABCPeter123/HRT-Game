@@ -23,10 +23,22 @@ async function inject(tabId){
    throw new Error("Cannot inspect this tab. Try a normal HTTPS competition page.");
  }
 }
-function sanitizeRule(raw){
+function sanitizeRule(raw,sym=null,field=null){
  const value=typeof raw==="string"?{selector:raw}:raw;
  if(!value||typeof value!=="object")return null;
  const selector=String(value.selector??"").trim().slice(0,500);
+ if(value.mode==="symbol"){
+   if(!SUPPORTED_SYMBOLS.has(sym)||!SUPPORTED_FIELDS.has(field) ||
+      (value.symbol && value.symbol!==sym) ||
+      (value.field && value.field!==field))
+     throw new Error("Symbol lock does not match the mapped field.");
+   const source=["auto","label","header","selector"].includes(value.source)?value.source:"auto";
+   const rowSelector=String(value.rowSelector??"").trim().slice(0,500);
+   if(source==="selector"&&!selector)throw new Error("Field selector is required for scoped selector mode.");
+   const attr=String(value.attribute??"").trim().slice(0,70);
+   return {mode:"symbol",symbol:sym,field,source,rowSelector,selector,
+     ...(ATTRIBUTE.test(attr)?{attribute:attr}:{})};
+ }
  if(!selector)return null;
  const rule={selector};
  if(Number.isInteger(value.elementIndex)&&value.elementIndex>=0&&value.elementIndex<60)
@@ -72,7 +84,7 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
      const {origin}=await sourceInfo(tabId);
      if(!SUPPORTED_SYMBOLS.has(message.sym)||!SUPPORTED_FIELDS.has(message.field))
        throw new Error("Invalid symbol or market field.");
-     const rule=sanitizeRule(message.rule??message.selector);
+     const rule=sanitizeRule(message.rule??message.selector,message.sym,message.field);
      const key=mappingKey(origin);
      const saved=await chrome.storage.local.get(key),map=saved[key]||{};
      map[message.sym]??={};
@@ -87,9 +99,12 @@ chrome.runtime.onMessage.addListener((message,sender,reply)=>{
      await sourceInfo(message.tabId);
      await inject(message.tabId);
      // Only the chosen field's numeric candidates come back, not page text.
-     const rule=sanitizeRule(message.rule);
-     if(!rule)return {ok:false,error:"No CSS selector yet",elements:0,values:[]};
-     return await chrome.tabs.sendMessage(message.tabId,{type:"PREVIEW",rule});
+     if(!SUPPORTED_SYMBOLS.has(message.sym)||!SUPPORTED_FIELDS.has(message.field))
+       throw new Error("Select a valid field first.");
+     const rule=sanitizeRule(message.rule,message.sym,message.field);
+     if(!rule)return {ok:false,error:"No field mapping yet",elements:0,values:[]};
+     return await chrome.tabs.sendMessage(message.tabId,{
+       type:"PREVIEW",rule,sym:message.sym,field:message.field});
    }
    if(message.type==="MARKET_CAPTURE"){
      const session=await chrome.storage.session.get(["activeSourceTabId","activeOrigin"]);

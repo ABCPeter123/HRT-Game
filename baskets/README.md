@@ -104,6 +104,21 @@ The bridge listens on \`127.0.0.1:8765\` and prints a **fresh 36-character sessi
 
 **Step C: Map the game's visible numeric fields.** Open the actual Baskets trading page, then click the **Baskets Local Market Reader** extension button. Paste the bridge session key and save. For each GRID, CURE and SAFE, click **Pick** next to **Bid**, then click the visible best-bid number in the actual game. Repeat for **Ask**, for six selections in total. If useful, map quote sizes, your positions and working-order sizes. The extension stores field extraction rules locally for that website. You may type/edit a CSS selector instead of picking it.
 
+**Symbol-locked tracking (recommended for moving orderbooks):** Use the extension's **Follow GRID / CURE / SAFE dynamically** checkbox on each mapped field. This binds each value to its *symbol name*, not an absolute row index. On every capture tick, the extension searches the current visible DOM for a unique matching instrument row, then reads that row's field. It works even if rows are reordered or replaced, as long as the symbol is readable and the row structure remains supported.
+
+The **Pick** action tries to configure this automatically. After updating the extension, **reload the extension at \`chrome://extensions\` and refresh the game tab** before picking again. Existing mappings remain intact, but legacy Element # or Number # rules are not automatically converted because that could silently misassociate a quote. Enable the checkbox and verify each one, or Pick again.
+
+The dynamic mapping offers a **Row CSS selector** and four field-detection methods:
+
+- **Label or table heading (recommended):** Reads a value paired with the Bid / Ask text or an HTML table column heading, even when the fields themselves change order. If both methods are available but disagree, the field is rejected rather than guessed.
+- **Labeled value:** Reads a specific field near its visible label, e.g. \`GRID Ask 400.5 Bid 399.5\`. Reversing label order does not reverse which number is bid.
+- **Table column heading:** Finds the column currently headed \`Bid\` or \`Ask\`, then reads that column in the identified symbol row, even after columns are reordered.
+- **CSS selector within row:** Finds a field such as \`[data-field="bid"]\` only within the row currently identified as \`GRID\`. This supports nonstandard labels or an explicit \`data-price\` attribute. A selector matching multiple values inside that row is rejected.
+
+For ordinary HTML tables, set Row CSS selector to \`tr\`. For custom layouts, try a common instrument-row class such as \`.quote-row\` or a stable attribute selector such as \`[data-symbol]\`. **Do not** use an absolute \`:nth-child(...)\` selector in symbol-locked mode. The actual site markup is not available, so you must confirm which row selector is correct on the game page. Click **Check** next to each field and confirm the returned symbol, field and current value before starting the reader.
+
+If the symbol disappears, the row selector matches several rows bearing the same symbol, both label and header methods disagree, or the field becomes ambiguous, that field **stops updating**. The extension does not reuse the first row or silently fall back to an index. A missing quote may leave the last saved value visible, but the Execution Desk's stale-quote safeguard excludes it from new calls during connected capture.
+
 **Verify every mapped value before capture.** Reopen the extension and click **Check** beside a field, or **Check all six bid/ask fields**. The preview shows exactly which numeric value would be read. A selector that matches several rows, or an element with several numbers, is intentionally *ambiguous* and will not be captured until you specify its index.
 
 For example, suppose a single container displays `GRID Bid $399.50 Ask $400.50 Size 100`. Select that container as the Bid field, set **Number # = 1**, and click Check. For the Ask field, use the same selector but choose **Number # = 2**. If `.price` matches a list of prices, choose **Element #** as well (1 = first matching element, 2 = second). If numbers are stored in an HTML attribute instead of text, enter the attribute name, for example `aria-label` or `data-price`. Blank number and element indices mean automatic selection only when there is exactly one possible match.
