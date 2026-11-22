@@ -7,7 +7,7 @@ Independent projects for trading competitions. Each game keeps its own source co
 | HRT AlgoArena stock/news prediction | [algoarena](algoarena/) | Existing research and source |
 | Scavenger | [scavenger](scavenger/) | **Live decision panel available** |
 | Baskets | [baskets](baskets/) | **Live decision panel available in GitHub** |
-| Vault | [vault](vault/) | Ready for development |
+| Vault | [vault](vault/) | **Live decision panel and local reader available in GitHub** |
 | Treasures & Trash | [treasures-and-trash](treasures-and-trash/) | **Live decision panel available in GitHub** |
 | Liar's Market | [liars-market](liars-market/) | **Live decision panel available in GitHub** |
 
@@ -19,9 +19,9 @@ The five Waterloo Quant Club games are from the Fall 2026 Trading Competition pa
 python -m http.server 8000
 ```
 
-Open `http://localhost:8000/` to select a game. Scavenger is at `/scavenger/`; Baskets is at `/baskets/`; Liar's Market is at `/liars-market/`; Treasures & Trash is at `/treasures-and-trash/`. Each runs without a backend or AI API, and saves observations in the local browser. Run `cd baskets && npm test`, `cd liars-market && npm test` or `cd treasures-and-trash && npm test` to validate the corresponding panel.
+Open `http://localhost:8000/` to select a game. Scavenger is at `/scavenger/`; Baskets is at `/baskets/`; Vault is at `/vault/`; Liar's Market is at `/liars-market/`; Treasures & Trash is at `/treasures-and-trash/`. Each runs without a backend or AI API, and saves observations in the local browser. Run `cd vault && npm test`, `cd baskets && npm test`, `cd liars-market && npm test` or `cd treasures-and-trash && npm test` to validate the corresponding panel.
 
-Each implemented game has a **Reset entire game** button, distinct from per-round or timer reset. It clears only that game's saved browser data, after confirmation. The competition homepage includes an optional **Erase all saved game data** button that clears the four implemented panels. Vault currently has only a placeholder and no state to reset.
+Each implemented game has a **Reset entire game** button, distinct from per-round or timer reset. It clears only that game's saved browser data, after confirmation. The competition homepage includes an optional **Erase all saved game data** button that clears all five implemented panels, including Vault.
 
 Liar's Market now follows a continuous **Deal cards → Claims & calls → Record result** workflow. Recording a finished hand automatically advances to the next sub-game.
 
@@ -41,3 +41,5 @@ The submission CSV is saved in `algoarena/predictions.csv`, and research reports
 ## Adding a game
 
 Keep each game's source, tests, datasets, dependencies and instructions in its own folder. Avoid creating game-specific code at the repository root. Shared GitHub Actions workflows live under `.github/workflows/`.
+
+Vault adds a separate chip-inference and market-making panel, plus a safe Vault-specific read-only local reader. See [Vault instructions](vault/README.md). Baskets' existing capture bridge is not modified.
