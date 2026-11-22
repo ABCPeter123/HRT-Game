@@ -199,7 +199,7 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
       $("quickQty").max=String(order.qty);
       $("quickQty").readOnly=quickStatus==="FILLED";
       $("quickPrice").value=quickPrice;
-      $("quickQtyButtons").innerHTML=[["25%","25"],["50%","50"],["75%","75"],["All","100"],
+      $("quickQtyButtons").innerHTML=[["25%","25"],["50%","50"],["75%","75"],
         ["−1","minus"],["+1","plus"]].map(([label,val])=>
         '<button type="button" class="button small ghost" data-quick-qty="'+val+
         '" '+(quickStatus==="FILLED"?"disabled":"")+'>'+label+'</button>').join("");
