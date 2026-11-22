@@ -1,0 +1,157 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b111b">
+<title>Vault | Quant Comp 2026</title><link rel="stylesheet" href="./styles.css">
+</head><body><div class="shell">
+<header class="header">
+  <a class="back" href="../">← All competition games</a>
+  <div class="eyebrow">WATERLOO QUANT CLUB / GAME 03</div>
+  <h1>Vault</h1><p>Estimate chip settlement, manage maker quotes, and find taker executions. All decisions run locally.</p>
+  <div class="top-controls">
+    <div id="rounds" class="rounds" role="group" aria-label="Trading round"></div>
+    <label>Team cohort<select id="cohort"><option value="maker14">Maker in rounds 1 & 4</option><option value="maker23">Maker in rounds 2 & 3</option></select></label>
+    <span id="role-pill" class="role-pill">MAKER</span>
+    <button id="reset-game" class="danger" type="button">Reset entire game</button>
+  </div>
+</header>
+<section class="status-bar">
+  <div><span class="mini">CURRENT ROUND</span><strong id="round-label">Round 1 / 4</strong></div>
+  <div><span class="mini">TIME / 10:30</span><strong id="clock">00:00</strong></div>
+  <button id="clock-toggle" type="button">Start timer</button>
+  <button id="clock-reset" class="ghost" type="button">Reset clock</button>
+  <div><span class="mini">NEXT PUBLIC REVEAL</span><strong id="next-public">0:30</strong></div>
+  <div><span class="mini">MAKER QUOTE PENALTY</span><strong id="penalty-live">$0.00/s</strong></div>
+</section>
+<section class="decision" aria-live="polite">
+  <div class="eyebrow">BEST ACTION RIGHT NOW</div>
+  <div class="decision-line"><div class="action" id="best-action">ENTER MARKET DATA</div><div id="best-symbol" class="symbol"></div></div>
+  <p id="best-reason">Enter your available chip reveals and the visible market bid/ask prices. The panel will recommend a limit order or quote.</p>
+  <div class="decision-tools">
+    <button id="copy-best" class="primary" type="button">Copy suggested order</button>
+    <button id="draft-best" type="button">Use in fill draft</button>
+    <span id="model-warning" class="hint">Unobserved chips use the official uniform prior, not future knowledge.</span>
+  </div>
+</section>
+<section class="stagebar" aria-label="Decision workflow">
+  <button data-stage="reveal" class="stage selected"><span class="stage-number">1</span><span><strong>Read chips</strong><small>Enter reveals</small></span></button>
+  <button data-stage="trade" class="stage"><span class="stage-number">2</span><span><strong>Trade / quote</strong><small>Act on prices</small></span></button>
+  <button data-stage="review" class="stage"><span class="stage-number">3</span><span><strong>Monitor</strong><small>Fills & penalty</small></span></button>
+</section>
+<main>
+  <section id="stage-reveal" class="stage-body">
+    <div class="intro"><h2>What has been revealed?</h2><p>Public chips 1–20 reveal over time. Takers see them 30 seconds earlier and also receive private chips 21–30. Select a chip and enter its latest known information.</p></div>
+    <div class="reveal-summary">
+      <div><span class="mini">PARTIAL / KNOWN</span><strong id="known-partial">0</strong></div>
+      <div><span class="mini">TRUE VALUES</span><strong id="known-true">0</strong></div>
+      <div><span class="mini">REVEAL PROGRESS</span><strong id="schedule">Awaiting round</strong></div>
+    </div>
+    <div class="two-col">
+      <section class="panel">
+        <div class="panel-title"><h3>Chips in the vault</h3><span id="chip-focus-label" class="subtle">Selected chip 1</span></div>
+        <div class="chip-block"><strong>PUBLIC · CHIPS 1–20</strong><div id="public-chips" class="chip-grid"></div></div>
+        <div id="private-block" class="chip-block"><strong>PRIVATE · CHIPS 21–30 (TAKER ONLY)</strong><div id="private-chips" class="chip-grid"></div></div>
+        <p class="hint">Blue: partial reveal. Green: exact true value. Purple: combination clue. Click a chip to edit it.</p>
+      </section>
+      <section class="panel">
+        <h3>Selected chip information</h3><div id="selected-chip" class="selection-title">Chip 1</div>
+        <div class="chip-fields">
+          <label>Partial reveal format<select id="partial-type">
+            <option value="unknown">Numeric, type not specified</option>
+            <option value="true">Known true-type chip</option>
+            <option value="error">Known error-type chip</option>
+            <option value="false">Known false-type chip</option>
+            <option value="combo">Combination (mean of two other chips)</option>
+            <option value="none">No partial reveal yet</option>
+          </select></label>
+          <label id="partial-wrap">Displayed number<input id="partial-value" type="number" min="1" max="10" step="1" inputmode="numeric" placeholder="1 to 10"></label>
+          <div id="combo-wrap" class="combo-fields" hidden>
+            <label>Referenced chip A<input id="combo-a" type="number" min="1" max="30" step="1" inputmode="numeric" placeholder="Chip ID"></label>
+            <label>Referenced chip B<input id="combo-b" type="number" min="1" max="30" step="1" inputmode="numeric" placeholder="Chip ID"></label>
+            <label>Rounded mean shown<input id="combo-value" type="number" min="1" max="10" step="1" inputmode="numeric" placeholder="1 to 10"></label>
+          </div>
+          <label>True value (when explicitly revealed)<input id="true-value" type="number" min="1" max="10" step="1" inputmode="numeric" placeholder="Unknown"></label>
+          <div class="inline"><button class="primary" id="save-chip" type="button">Save chip &amp; update prices</button><button class="ghost" id="clear-chip" type="button">Clear chip</button><button class="ghost" id="next-chip" type="button">Next chip →</button></div>
+          <div id="chip-feedback" class="hint" role="status"></div>
+        </div>
+        <details><summary>Fast bulk entry for numeric chip reveals</summary>
+          <p class="hint">Add several observed values using <code>ID:partial/true</code>. For example: <code>1:8/8 2:6/- 3:-/7</code>. Hyphen means unknown. This replaces values for listed chips only. Combination chips must be entered above.</p>
+          <textarea id="bulk-chips" rows="3" placeholder="1:8/8 2:6/- 3:-/7"></textarea>
+          <button id="apply-bulk" type="button">Import chip values</button>
+        </details>
+      </section>
+    </div>
+    <div class="stage-next"><button id="to-trade" type="button" class="primary">Review values and trade →</button></div>
+  </section>
+  <section id="stage-trade" class="stage-body" hidden>
+    <div class="intro"><h2>Trade the three contracts</h2><p>Update quotes from the real exchange. For maker rounds, first post qualifying two-sided limits. For taker rounds, use immediate-or-cancel orders only.</p></div>
+    <div id="fair-grid" class="fair-grid"></div>
+    <div class="panel">
+      <div class="panel-title"><h3>Fast market entry</h3><span class="subtle">Bid / ask / visible size / inventory</span></div>
+      <p class="hint">Type observed top-of-book prices. Both sides need a valid price in the exchange's tick increment before a taker order is considered.</p>
+      <div id="market-grid" class="market-grid"></div>
+    </div>
+    <div class="two-col">
+      <section class="panel">
+        <h3>Recommended action per contract</h3>
+        <div id="actions"></div>
+        <p class="hint">A recommendation never submits an order. Only enter an execution in the journal after it actually fills.</p>
+      </section>
+      <section class="panel">
+        <h3>Your resting maker quotes</h3><p class="hint" id="maker-description">Record your own live bid and ask and their outstanding share sizes. Only sizes 10 or more count toward the quote-width penalty.</p>
+        <div class="field-row"><label>Contract<select id="own-symbol"><option>VAULT</option><option>G5</option><option>PUB</option></select></label></div>
+        <div class="field-grid">
+          <label>Own qualifying bid<input id="own-bid" type="number" inputmode="decimal"></label>
+          <label>Own bid size<input id="own-bid-size" type="number" min="0" step="1" inputmode="numeric"></label>
+          <label>Own qualifying ask<input id="own-ask" type="number" inputmode="decimal"></label>
+          <label>Own ask size<input id="own-ask-size" type="number" min="0" step="1" inputmode="numeric"></label>
+        </div>
+        <button id="record-quote" class="primary" type="button">Save working quotes</button>
+        <div id="maker-penalty-detail" class="hint"></div>
+      </section>
+    </div>
+    <div class="stage-next"><button id="to-review" type="button" class="primary">Track fills and risk →</button></div>
+  </section>
+  <section id="stage-review" class="stage-body" hidden>
+    <div class="intro"><h2>Positions, fills and quote penalties</h2><p>Log confirmed fills. If a fill hit your own resting maker quote, mark it to calculate the stated $0.05/share rebate.</p></div>
+    <div id="portfolio-grid" class="portfolio-grid"></div>
+    <div class="two-col">
+      <section class="panel">
+        <h3>Record actual execution</h3>
+        <div class="field-grid">
+          <label>Contract<select id="fill-symbol"><option>VAULT</option><option>G5</option><option>PUB</option></select></label>
+          <label>Side<select id="fill-side"><option>BUY</option><option>SELL</option></select></label>
+          <label>Filled shares<input id="fill-qty" type="number" min="1" step="1" inputmode="numeric"></label>
+          <label>Fill price<input id="fill-price" type="number" min="0" step=".1" inputmode="decimal"></label>
+        </div>
+        <label class="checkbox-row"><input id="fill-resting" type="checkbox"> My resting maker quote was filled (rebate + 5¢ / share)</label>
+        <div class="inline"><button id="record-fill" class="primary" type="button">Record filled order</button><button id="undo-fill" class="ghost" type="button">Undo latest fill</button></div>
+        <div class="hint" id="fill-status" role="status"></div>
+      </section>
+      <section class="panel">
+        <h3>Risk and round record</h3>
+        <div id="risk-summary"></div>
+        <h4>Recent fills</h4><div id="fill-history" class="history"></div>
+        <button id="next-round" type="button" class="ghost">Next round →</button>
+      </section>
+    </div>
+  </section>
+  <details class="panel help"><summary>Rules, assumptions and how every input works</summary>
+    <p><strong>Maker / taker roles:</strong> select the maker cohort assigned by the proctor. The role follows rounds 1 and 4 or rounds 2 and 3. Four rounds, each 10:30.</p>
+    <p><strong>Chips:</strong> 30 independent integer values from 1–10. Chips 1–20 are public, 21–30 are visible only to takers. A numeric partial is 50% true, 25% within ±2 of true, and 15% incorrect; known combination chips show the rounded mean of two other chips and have 10% incidence. The mixture is conditional on the observed numeric type. Unknown hidden chips use uniform priors.</p>
+    <p><strong>Settlement:</strong> VAULT = sum of 30 true values; PUB = sum of public 20 true values; G5 = count of all 30 true values greater than 5. Event-bot trades NEVER change settlement in Vault.</p>
+    <p><strong>Book:</strong> Best bid is the highest displayed buy price; best ask is the lowest sell price. Sizes are visible shares at these levels. Position is already-filled shares; working buys/sells are outstanding unfilled shares.</p>
+    <p><strong>Orders:</strong> Makers may post passive limits and take liquidity. Takers may only use immediate-or-cancel. Price bands: VAULT $30–300, G5 $0–30, PUB $20–200. Tick sizes: $0.25 for VAULT and PUB, $0.10 for G5. Per-asset limits: ±500 makers and ±300 takers including worst-case outstanding fills.</p>
+    <p><strong>Maker penalty:</strong> for each contract, $0.01 per second times excess of qualifying own quote width over Wmax. Each own side must have at least 10 outstanding shares, otherwise the exchange band endpoint substitutes. Wmax is a standard deviation calculated using only exact public chip values makers have received. Penalty does not apply during first 10 seconds and is waived for 5 seconds after a >10-share resting quote was filled or chipped. Timer-based penalty accrual is a local estimate.</p>
+    <p><strong>Model:</strong> Values come from an approximate marginal posterior including combination constraints. Correlations from combination chips are not fully represented in uncertainty. Suggested orders account for observed executable top price, uncertainty, your risk setting, and inventory capacity. No specific customer fill rate is claimed.</p>
+    <p><strong>Live capture:</strong> optional read-only local numeric bridge can populate book prices from user-mapped visible DOM elements. It does not reveal hidden chip data, connect to the exchange, or place orders. Prices must be checked against the real interface.</p>
+  </details>
+</main>
+<section class="settings panel">
+  <label>Downside sensitivity <select id="risk"><option value="0">0% · maximize EV</option><option value=".35" selected>35% · balanced</option><option value=".7">70% · cautious</option><option value="1">100% · conservative</option></select></label>
+  <label>Maximum suggested order size <input id="size-limit" type="number" min="10" max="1000" step="1" value="30"></label>
+  <div class="settings-actions"><button id="connect-bridge" type="button">Connect Vault local reader</button><button id="disconnect-bridge" class="ghost" type="button" disabled>Stop reader</button>
+  <input id="bridge-key" type="password" autocomplete="off" placeholder="Vault reader's 36-character key" aria-label="Bridge session key"></div>
+  <div class="hint" id="bridge-status">Optional. Run <code>node vault/bridge/server.mjs</code> and the Vault Chrome reader to import visible quotes; manual entry always works.</div>
+</section>
+<footer>All decisions are local and advisory. No order is submitted to the real game. Production Vercel deployments remain paused.</footer>
+</div><script type="module" src="./app.js"></script></body></html>
