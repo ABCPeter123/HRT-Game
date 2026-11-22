@@ -1,0 +1,53 @@
+name: Competition game manuals
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'manual.css'
+      - 'sw.js'
+      - 'scavenger/manual.html'
+      - 'baskets/manual.html'
+      - 'vault/manual.html'
+      - 'treasures-and-trash/manual.html'
+      - 'liars-market/manual.html'
+      - 'scavenger/index.html'
+      - 'baskets/index.html'
+      - 'vault/index.html'
+      - 'treasures-and-trash/index.html'
+      - 'liars-market/index.html'
+      - 'scripts/build-site.mjs'
+      - 'scripts/check-manuals.mjs'
+      - '.github/workflows/manuals-check.yml'
+  pull_request:
+    paths:
+      - 'index.html'
+      - 'manual.css'
+      - 'sw.js'
+      - 'scavenger/**'
+      - 'baskets/**'
+      - 'vault/**'
+      - 'treasures-and-trash/**'
+      - 'liars-market/**'
+      - 'scripts/build-site.mjs'
+      - 'scripts/check-manuals.mjs'
+      - '.github/workflows/manuals-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check scripts/check-manuals.mjs
+      - run: node scripts/build-site.mjs
+      - run: node scripts/check-manuals.mjs
