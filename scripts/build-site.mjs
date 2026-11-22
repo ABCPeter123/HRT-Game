@@ -8,6 +8,7 @@ const required=[
   "index.html",
   "sw.js",
   "manual.css",
+  "mobile.css",
   "scavenger/index.html",
   "scavenger/manual.html",
   "scavenger/app.js",
