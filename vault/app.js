@@ -31,6 +31,7 @@ try{
 }catch{}
 let latest=null,lastBest=null,tickHandle=null,timerStart=0,elapsedAtStart=0,lastPenaltyTime=0;
 let bridgeActive=false,bridgeBusy=false,bridgeSeq=-1,bridgeSource="",lastBridgeData=0;
+let capturedPositionSymbols=new Set();
 function store(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch{}}
 function r(){return state.rounds[state.round-1];}
 function currentRole(){return roleForRound(state.cohort,state.round);}
@@ -78,7 +79,9 @@ function renderClock(){
 }
 function selectRound(value){
   if(value<1||value>4)return;
-  pauseTimer();state.round=value;state.stage="reveal";state.selected=1;
+  pauseTimer();bridgeActive=false;bridgeSeq=-1;capturedPositionSymbols.clear();
+  $("connect-bridge").disabled=false;$("disconnect-bridge").disabled=true;
+  state.round=value;state.stage="reveal";state.selected=1;
   r().role=currentRole();
   renderAll();
 }
@@ -351,6 +354,9 @@ function renderRisk(){
 }
 function recordFill(){
  const symbol=$("fill-symbol").value,side=$("fill-side").value;
+ if(bridgeActive&&capturedPositionSymbols.has(symbol)){
+   message("fill-status","Live position capture is active for this contract. Stop the reader or remove its position mapping before manually recording fills to avoid double-counting.",true);return;
+ }
  const qty=Number($("fill-qty").value),price=Number($("fill-price").value);
  const quoted=$("fill-resting").checked;
  const rawOriginal=$("fill-original-size").value.trim();
@@ -419,7 +425,7 @@ $("market-grid").addEventListener("input",e=>{
  const el=e.target.closest("[data-sym][data-field]");if(!el)return;
  const sym=el.dataset.sym,key=el.dataset.field;
  r().books[sym][key]=el.value;
- if(key==="position")r().books[sym].ledgerComplete=false;
+ if(key==="position"){r().books[sym].ledgerComplete=false;capturedPositionSymbols.delete(sym);}
  store();renderFair();renderDecision();renderRisk();
 });
 $("own-symbol").addEventListener("change",e=>{state.ownSymbol=e.target.value;store();syncOwnQuotes();});
@@ -444,7 +450,7 @@ $("reset-game").addEventListener("click",()=>{
  if(!window.confirm("Erase ALL four Vault rounds, 30-chip reveal records, quotes, fills, score estimates and settings? This cannot be undone."))return;
  pauseTimer();
  try{localStorage.removeItem(KEY);}catch{message("bridge-status","Saved Vault data could not be cleared.",true);return;}
- state=fresh();state.stage="reveal";bridgeActive=false;bridgeSeq=-1;lastBest=null;
+ state=fresh();state.stage="reveal";bridgeActive=false;bridgeSeq=-1;capturedPositionSymbols.clear();lastBest=null;
  $("bridge-key").value="";$("bulk-chips").value="";$("fill-qty").value="";$("fill-price").value="";
  $("connect-bridge").disabled=false;$("disconnect-bridge").disabled=true;
  renderAll();message("chip-feedback","Vault reset. Round 1, chip 1.");
@@ -463,6 +469,7 @@ async function pollBridge(){
   if(data.stale||!data.snapshot){bridgeStatus("Bridge connected, waiting for mapped game quote values.");return;}
   if(data.seq!==bridgeSeq){
     bridgeSeq=data.seq;
+    for(const sym of SYMBOLS)if(data.snapshot.books?.[sym]?.position!==undefined)capturedPositionSymbols.add(sym);
     const updated=mergeMarketSnapshot(r().books,data.snapshot);
     if(updated.changed){
       r().books=updated.books;store();
@@ -480,7 +487,7 @@ $("connect-bridge").addEventListener("click",()=>{
  bridgeActive=true;bridgeSeq=-1;$("connect-bridge").disabled=true;$("disconnect-bridge").disabled=false;pollBridge();
 });
 $("disconnect-bridge").addEventListener("click",()=>{
- bridgeActive=false;bridgeSeq=-1;
+ bridgeActive=false;bridgeSeq=-1;capturedPositionSymbols.clear();
  $("connect-bridge").disabled=false;$("disconnect-bridge").disabled=true;
  bridgeStatus("Stopped reading the local Vault bridge. Manual entry is available.");
 });
