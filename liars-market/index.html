@@ -37,7 +37,7 @@
 <div class="flow-stage" id="stage-deal" data-flow-view="deal">
   <div class="stage-intro"><h2>Set up this hand</h2><p>Start with the scoreboard. Then tap your cards and the three face-up center cards. The hidden cards remain unknown.</p></div>
   <div class="deal-grid"><section class="panel">
-  <div class="title-row"><h2>3. Round scoreboard</h2><span class="hint">Cards dealt depend on score</span></div>
+  <div class="title-row"><h2>Scores before this hand</h2><span class="hint">Determines cards dealt</span></div>
   <p class="description">Enter each team's current points at the start of this sub-game. Seat order runs clockwise; choose your seat once per round.</p>
   <div class="fieldrow">
     <label class="field grow">My seat <select id="my-seat"><option value="0">Seat 1</option><option value="1">Seat 2</option><option value="2">Seat 3</option><option value="3">Seat 4</option></select></label>
@@ -46,7 +46,7 @@
   <div id="scoreboard" class="scoreboard"></div>
   <div class="hint" id="active-summary"></div>
 </section><section class="panel">
-  <div class="title-row"><h2>2. Known cards</h2><span class="hint">Tap once per card</span></div>
+  <div class="title-row"><h2>Your cards and visible center</h2><span class="hint">Tap once per card</span></div>
   <p class="description">All private cards in your hand plus face-up center cards are known. Other teams' hands and face-down center cards stay unknown.</p>
   <div class="fieldrow" id="card-zone"><button class="zone selected" data-zone="hand">My hand</button><button class="zone" data-zone="center">Face-up center</button></div>
   <div class="card-summary">
@@ -66,7 +66,7 @@
   <div class="stage-intro"><h2>Follow the claims</h2><p>Each time someone speaks a new claim, enter it below. The response updates immediately. If it is your turn to claim, tap a suggested legal claim.</p></div>
   <div class="play-grid">
     <div class="play-primary"><section class="panel" id="claim-panel">
-  <div class="title-row"><h2>1. Latest claim</h2><span class="hint">10 sec to react</span></div>
+  <div class="title-row"><h2>Latest spoken claim</h2><span class="hint">10 sec to react</span></div>
   <p class="description">Enter the most recent claim, not what you think is true. A claim must beat the previous claim to be legal.</p>
   <div class="fieldrow">
     <label class="field grow">Quick notation
@@ -92,7 +92,7 @@
   </div>
   <div class="shortcuts">Notation: HC 9, P Q, ST 10, 2P K 5, TR A, FH Q 4, 4K 8, SF K, 5K 7, 6K A. A = Ace.</div>
 </section><section class="hero" aria-live="polite">
-  <div class="eyebrow">YOUR REACTION TO THE CURRENT CLAIM</div>
+  <div class="eyebrow">BEST MOVE RIGHT NOW</div>
   <div class="hero-line"><div id="reaction-action" class="move">ENTER CLAIM</div><span id="probability" class="number"></span></div>
   <div id="reaction-explain" class="subtle">Choose the latest claimed hand below. The panel will calculate Bluff, Nuts and Pass.</div>
   <div class="secondary">
@@ -120,7 +120,7 @@
   <div id="opponents"></div>
   <div class="hint" id="counter-note"></div>
 </section><section class="panel">
-  <div class="title-row"><h2>Reference clock</h2><span class="hint">Not official game timer</span></div>
+  <div class="title-row"><h2>Reaction timer</h2><span class="hint">Not official game timer</span></div>
   <div class="timer" id="timer">00:10</div>
   <div class="fieldrow"><button data-timer="10">Reaction 10s</button><button data-timer="15">Claim 15s</button><button data-timer="30">Extension 30s</button><button id="timer-stop" class="ghost">Stop</button></div>
   <p class="description">Teams have four +15 second extensions each round. The extension button shows the total 30-second window for one action.</p>
@@ -131,7 +131,7 @@
 <div class="flow-stage" id="stage-result" data-flow-view="result" hidden>
   <div class="stage-intro"><h2>Record the result</h2><p>Select what actually happened, then record the opposing team. Points will transfer and the next hand will open with new card counts.</p></div>
   <div class="result-grid"><section class="panel">
-  <div class="title-row"><h2>After a reveal</h2><span class="hint">Record actual outcome</span></div>
+  <div class="title-row"><h2>How did this hand end?</h2><span class="hint">Record actual outcome</span></div>
   <p class="description">Use this only when a sub-game ends. A recorded outcome updates both teams' points and the next hand's card counts.</p>
   <div class="fieldrow">
     <label class="field grow">Challenge / ending <select id="outcome">
