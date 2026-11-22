@@ -26,6 +26,8 @@ try{
      for(const s of SYMBOLS)state.rounds[i].books[s]={...base.books[s],...(state.rounds[i].books?.[s]||{})};
      if(!Array.isArray(state.rounds[i].chips)||state.rounds[i].chips.length!==30)state.rounds[i].chips=base.chips;
      state.rounds[i].clockRunning=false;
+     if(!state.rounds[i].lastQuoteFillAt||typeof state.rounds[i].lastQuoteFillAt!=="object")
+       state.rounds[i].lastQuoteFillAt={VAULT:-Infinity,G5:-Infinity,PUB:-Infinity};
    }
  }
 }catch{}
@@ -73,7 +75,7 @@ function renderClock(){
   const modelNow=latest;
   if(modelNow){
     const penalty=SYMBOLS.reduce((x,s)=>x+makerPenalty(s,row.books[s],modelNow.makerWidths[s],
-      {elapsed:row.elapsed,lastQuoteFillAt:row.lastQuoteFillAt}).rate,0);
+      {elapsed:row.elapsed,lastQuoteFillAt:row.lastQuoteFillAt?.[s]??-Infinity}).rate,0);
     $("penalty-live").textContent=role==="maker"?money(penalty)+"/s":"Not applicable";
   }
 }
@@ -98,7 +100,7 @@ function tick(){
   if(delta>0&&currentRole()==="maker"&&latest){
     const charge=SYMBOLS.reduce((acc,s)=>
       acc+makerPenalty(s,row.books[s],latest.makerWidths[s],
-       {elapsed:row.elapsed,lastQuoteFillAt:row.lastQuoteFillAt}).rate,0);
+       {elapsed:row.elapsed,lastQuoteFillAt:row.lastQuoteFillAt?.[s]??-Infinity}).rate,0);
     row.penalty=Math.max(0,row.penalty+delta*charge);
   }
   if(row.elapsed>=DURATION){pauseTimer();message("fill-status","Round clock complete. Verify actual organizer time.");}
@@ -225,7 +227,7 @@ function renderOwnPenalty(){
  if(!latest)return;
  const s=state.ownSymbol;
  const p=makerPenalty(s,r().books[s],latest.makerWidths[s],
-   {elapsed:r().elapsed,lastQuoteFillAt:r().lastQuoteFillAt});
+   {elapsed:r().elapsed,lastQuoteFillAt:r().lastQuoteFillAt?.[s]??-Infinity});
  $("maker-penalty-detail").textContent=currentRole()==="maker"?
    "Unpenalized maximum width Wmax = "+money(latest.makerWidths[s])+
     ". Effective qualifying width "+money(p.effectiveSpread)+". "+
@@ -365,11 +367,11 @@ function recordFill(){
    message("fill-status","Enter the resting order size before the fill (at least the filled shares).",true);return;
  }
  if(quoted&&currentRole()!=="maker"){message("fill-status","Taker fills cannot earn maker rebates.",true);return;}
- const before={...r().books[symbol]},last=r().lastQuoteFillAt;
+ const before={...r().books[symbol]},last=r().lastQuoteFillAt?.[symbol]??-Infinity;
  try{
    const next=applyFill(before,currentRole(),{symbol,side,quantity:qty,price,quoted});
    r().books[symbol]=next;
-   if(quoted&&originalSize!==null&&originalSize>10)r().lastQuoteFillAt=r().elapsed;
+   if(quoted&&originalSize!==null&&originalSize>10)r().lastQuoteFillAt[symbol]=r().elapsed;
    r().fills.push({symbol,side,qty,price,quoted,originalSize,before,lastQuoteFillAt:last});
    store();marketInputs();renderDecision();renderRisk();
    message("fill-status","Confirmed fill recorded. Working orders may need updating."+
@@ -379,7 +381,7 @@ function recordFill(){
 function undoFill(){
  const f=r().fills.pop();
  if(!f){message("fill-status","No fill to undo.");return;}
- r().books[f.symbol]=f.before;r().lastQuoteFillAt=f.lastQuoteFillAt;
+ r().books[f.symbol]=f.before;r().lastQuoteFillAt[f.symbol]=f.lastQuoteFillAt;
  store();marketInputs();renderDecision();renderRisk();message("fill-status","Last fill entry restored.");
 }
 function setCohort(value){
@@ -404,7 +406,7 @@ $("to-review").addEventListener("click",()=>setStage("review"));
 $("clock-toggle").addEventListener("click",startClock);
 $("clock-reset").addEventListener("click",()=>{
  if(!window.confirm("Reset this round's local clock and estimated maker penalty? Orders, chips and fills remain saved."))return;
- pauseTimer();r().elapsed=0;r().penalty=0;r().lastQuoteFillAt=-Infinity;
+ pauseTimer();r().elapsed=0;r().penalty=0;r().lastQuoteFillAt={VAULT:-Infinity,G5:-Infinity,PUB:-Infinity};
  store();renderClock();renderRisk();renderDecision();
 });
 $("public-chips").addEventListener("click",e=>{const b=e.target.closest("[data-chip]");
