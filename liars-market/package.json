@@ -1,0 +1,6 @@
+{
+  "name":"wqc-liars-market-panel",
+  "private":true,
+  "type":"module",
+  "scripts":{"test":"node --test tests/*.test.mjs"}
+}
