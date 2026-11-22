@@ -24,3 +24,9 @@
 .bridge-live{color:var(--mint);border-color:#519c86;background:#193d36}
 #bridgeDetail{margin-top:11px}
 @media(max-width:670px){.quick-header,.quick-row{grid-template-columns:53px minmax(0,1fr) minmax(0,1fr) minmax(0,.85fr);gap:4px}.quick-row{padding:5px}.quick-input{font-size:14px;padding:3px;height:40px}.quick-symbol{font-size:10px;height:40px;padding:4px}.bridge-connect{gap:5px}.bridge-connect input{min-width:100%;width:100%}.bridge-connect button{flex:1}}
+
+/* Global reset for all rounds. Timer Reset above still affects the timer only. */
+.toolbar{flex-wrap:wrap}
+#reset-game{margin-left:auto;border-color:#84505a;color:#f4b1ba}
+#reset-game:hover{background:#39222d}
+@media(max-width:670px){#reset-game{width:100%;margin:0}}
