@@ -49,3 +49,15 @@ a.manual-callout-button{display:inline-flex;align-items:center;justify-content:c
 a.manual-callout-button:hover{background:#bdffe9;color:#04291f!important}
 a.manual-callout-button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 @media(max-width:700px){.manual-callout{flex-direction:column;align-items:stretch;gap:11px;padding:13px}.manual-callout-button{width:100%;text-align:center}}
+
+/* One-tap claims and official-outcome reporting; no shorthand required. */
+.seat-shortcuts,.result-shortcuts{display:flex;gap:6px;flex-wrap:wrap;margin:12px 0}
+.seat-shortcuts{align-items:center;padding:10px 11px;border:1px solid #42655f;background:#112e30;border-radius:9px}
+.seat-shortcuts span{display:block;font-size:11px;color:#adead8;font-weight:800;letter-spacing:.05em;margin-right:5px}
+.seat-shortcuts button{min-height:42px;flex:1 1 70px}
+.seat-shortcuts button.selected,.result-shortcuts button.selected{background:#26785e;border-color:#91f5dc;color:white}
+.result-shortcuts{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:9px 0}
+.result-shortcuts button{min-height:46px;font-size:12px}
+#claim-panel .compact-details{border-color:#4e7c71;background:#102f32}
+#claim-panel .compact-details summary{color:#a7fbe3;font-weight:800}
+@media(max-width:610px){.result-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.seat-shortcuts span{flex-basis:100%}}
