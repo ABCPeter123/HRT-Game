@@ -18,23 +18,54 @@
     <label class="select-label">Sub-game <select id="game-number" aria-label="Sub-game number"></select></label>
     <button id="next-game" class="ghost">Next hand →</button>
     <label class="select-label">Hands / round <select id="max-games"><option value="8">8, overview</option><option value="5">5, detailed rules</option></select></label>
+    <button id="reset-game" type="button" class="reset-control">Reset entire Game 5</button>
   </div>
 </header>
+
 <main>
-<section class="hero" aria-live="polite">
-  <div class="eyebrow">YOUR REACTION TO THE CURRENT CLAIM</div>
-  <div class="hero-line"><div id="reaction-action" class="move">ENTER CLAIM</div><span id="probability" class="number"></span></div>
-  <div id="reaction-explain" class="subtle">Choose the latest claimed hand below. The panel will calculate Bluff, Nuts and Pass.</div>
-  <div class="secondary">
-    <div><span class="mini-label">YOUR NEXT LEGAL CLAIM</span><strong id="suggested-claim">Waiting for cards</strong></div>
-    <div><span class="mini-label">MODELED EXISTENCE</span><strong id="suggested-prob">Unknown</strong></div>
-    <button id="use-suggestion" class="primary" disabled>Use as claim</button>
+
+<section class="flow-progress panel" aria-label="Sub-game progress">
+  <div class="flow-line"><strong id="flow-position">Round 1 · Hand 1</strong><span id="flow-status" class="hint">Start by entering known cards.</span></div>
+  <div id="flow-steps" class="flow-steps" role="group" aria-label="Current stage">
+    <button type="button" data-stage="deal" class="selected"><span class="step-index">1</span><span>Deal cards</span></button>
+    <button type="button" data-stage="play"><span class="step-index">2</span><span>Claims &amp; calls</span></button>
+    <button type="button" data-stage="result"><span class="step-index">3</span><span>Record result</span></button>
   </div>
-  <div class="perf" id="perf"></div>
+  <p class="description" id="flow-explain">Set the four scores and tap your cards and three visible center cards.</p>
+  <div class="flow-controls"><button id="flow-back" class="ghost" type="button">Back</button><button id="flow-next" class="primary" type="button">Continue to claims →</button></div>
 </section>
-<div class="columns">
-<div class="left">
-<section class="panel" id="claim-panel">
+<div class="flow-stage" id="stage-deal" data-flow-view="deal">
+  <div class="stage-intro"><h2>Set up this hand</h2><p>Start with the scoreboard. Then tap your cards and the three face-up center cards. The hidden cards remain unknown.</p></div>
+  <div class="deal-grid"><section class="panel">
+  <div class="title-row"><h2>3. Round scoreboard</h2><span class="hint">Cards dealt depend on score</span></div>
+  <p class="description">Enter each team's current points at the start of this sub-game. Seat order runs clockwise; choose your seat once per round.</p>
+  <div class="fieldrow">
+    <label class="field grow">My seat <select id="my-seat"><option value="0">Seat 1</option><option value="1">Seat 2</option><option value="2">Seat 3</option><option value="3">Seat 4</option></select></label>
+    <label class="field grow">Downside sensitivity <select id="risk"><option value="0">0%, maximize EV</option><option value=".35" selected>35%, balanced</option><option value=".70">70%, cautious</option><option value="1">100%, conservative</option></select></label>
+  </div>
+  <div id="scoreboard" class="scoreboard"></div>
+  <div class="hint" id="active-summary"></div>
+</section><section class="panel">
+  <div class="title-row"><h2>2. Known cards</h2><span class="hint">Tap once per card</span></div>
+  <p class="description">All private cards in your hand plus face-up center cards are known. Other teams' hands and face-down center cards stay unknown.</p>
+  <div class="fieldrow" id="card-zone"><button class="zone selected" data-zone="hand">My hand</button><button class="zone" data-zone="center">Face-up center</button></div>
+  <div class="card-summary">
+    <div><span class="mini-label">MY HAND</span><div id="hand-chips" class="chips"></div></div>
+    <div><span class="mini-label">FACE-UP CENTER</span><div id="center-chips" class="chips"></div></div>
+  </div>
+  <details open><summary>Card picker (52 cards + 2 Jokers)</summary>
+    <div id="deck" class="deck" aria-label="Pick visible cards"></div>
+    <div class="fieldrow compact"><button id="clear-hand" class="ghost">Clear hand</button><button id="clear-center" class="ghost">Clear center</button></div>
+  </details>
+  <div class="hint" id="card-validation"></div>
+</section></div>
+  <div class="stage-finish"><button id="deal-ready" type="button" class="primary">Cards entered. Start claims →</button><span class="hint" id="deal-ready-status"></span></div>
+</div>
+<div class="flow-stage" id="stage-play" data-flow-view="play" hidden>
+  <div class="play-known"><div><span class="mini-label">THIS HAND</span><span id="play-known-summary">No cards entered</span></div><button id="update-cards" type="button" class="ghost">Update cards / reveal center</button></div>
+  <div class="stage-intro"><h2>Follow the claims</h2><p>Each time someone speaks a new claim, enter it below. The response updates immediately. If it is your turn to claim, tap a suggested legal claim.</p></div>
+  <div class="play-grid">
+    <div class="play-primary"><section class="panel" id="claim-panel">
   <div class="title-row"><h2>1. Latest claim</h2><span class="hint">10 sec to react</span></div>
   <p class="description">Enter the most recent claim, not what you think is true. A claim must beat the previous claim to be legal.</p>
   <div class="fieldrow">
@@ -60,34 +91,18 @@
     <button id="clear-claim" class="ghost">Clear</button>
   </div>
   <div class="shortcuts">Notation: HC 9, P Q, ST 10, 2P K 5, TR A, FH Q 4, 4K 8, SF K, 5K 7, 6K A. A = Ace.</div>
-</section>
-<section class="panel">
-  <div class="title-row"><h2>2. Known cards</h2><span class="hint">Tap once per card</span></div>
-  <p class="description">All private cards in your hand plus face-up center cards are known. Other teams' hands and face-down center cards stay unknown.</p>
-  <div class="fieldrow" id="card-zone"><button class="zone selected" data-zone="hand">My hand</button><button class="zone" data-zone="center">Face-up center</button></div>
-  <div class="card-summary">
-    <div><span class="mini-label">MY HAND</span><div id="hand-chips" class="chips"></div></div>
-    <div><span class="mini-label">FACE-UP CENTER</span><div id="center-chips" class="chips"></div></div>
+</section><section class="hero" aria-live="polite">
+  <div class="eyebrow">YOUR REACTION TO THE CURRENT CLAIM</div>
+  <div class="hero-line"><div id="reaction-action" class="move">ENTER CLAIM</div><span id="probability" class="number"></span></div>
+  <div id="reaction-explain" class="subtle">Choose the latest claimed hand below. The panel will calculate Bluff, Nuts and Pass.</div>
+  <div class="secondary">
+    <div><span class="mini-label">YOUR NEXT LEGAL CLAIM</span><strong id="suggested-claim">Waiting for cards</strong></div>
+    <div><span class="mini-label">MODELED EXISTENCE</span><strong id="suggested-prob">Unknown</strong></div>
+    <button id="use-suggestion" class="primary" disabled>Use as claim</button>
   </div>
-  <details open><summary>Card picker (52 cards + 2 Jokers)</summary>
-    <div id="deck" class="deck" aria-label="Pick visible cards"></div>
-    <div class="fieldrow compact"><button id="clear-hand" class="ghost">Clear hand</button><button id="clear-center" class="ghost">Clear center</button></div>
-  </details>
-  <div class="hint" id="card-validation"></div>
-</section>
-<section class="panel">
-  <div class="title-row"><h2>3. Round scoreboard</h2><span class="hint">Cards dealt depend on score</span></div>
-  <p class="description">Enter each team's current points at the start of this sub-game. Seat order runs clockwise; choose your seat once per round.</p>
-  <div class="fieldrow">
-    <label class="field grow">My seat <select id="my-seat"><option value="0">Seat 1</option><option value="1">Seat 2</option><option value="2">Seat 3</option><option value="3">Seat 4</option></select></label>
-    <label class="field grow">Downside sensitivity <select id="risk"><option value="0">0%, maximize EV</option><option value=".35" selected>35%, balanced</option><option value=".70">70%, cautious</option><option value="1">100%, conservative</option></select></label>
-  </div>
-  <div id="scoreboard" class="scoreboard"></div>
-  <div class="hint" id="active-summary"></div>
-</section>
-</div>
-<div class="right">
-<section class="panel">
+  <div class="perf" id="perf"></div>
+</section></div>
+    <div class="play-secondary"><section class="panel">
   <h2>Probability and counterplay</h2>
   <div class="metrics">
     <div><span class="mini-label">CLAIM EXISTS</span><strong id="exist-pct">-</strong></div>
@@ -99,14 +114,23 @@
   <h3>Top legal claims</h3>
   <div id="claim-options" class="options"></div>
   <p class="description">Claim scores are heuristic estimates of challenge risk and future pressure, not full-game equilibrium values.</p>
-</section>
-<section class="panel">
+</section><section class="panel">
   <h2>Opponent strategy counters</h2>
   <p class="description">Recorded revealed outcomes update each seat's claim credibility within the current round. Tables reshuffle between rounds.</p>
   <div id="opponents"></div>
   <div class="hint" id="counter-note"></div>
-</section>
-<section class="panel">
+</section><section class="panel">
+  <div class="title-row"><h2>Reference clock</h2><span class="hint">Not official game timer</span></div>
+  <div class="timer" id="timer">00:10</div>
+  <div class="fieldrow"><button data-timer="10">Reaction 10s</button><button data-timer="15">Claim 15s</button><button data-timer="30">Extension 30s</button><button id="timer-stop" class="ghost">Stop</button></div>
+  <p class="description">Teams have four +15 second extensions each round. The extension button shows the total 30-second window for one action.</p>
+</section></div>
+  </div>
+  <div class="stage-finish"><button id="to-result" type="button" class="primary">Someone called / hand ended → Record result</button><span class="hint">Keep entering claims until a challenge, forced end, or timeout settles the hand.</span></div>
+</div>
+<div class="flow-stage" id="stage-result" data-flow-view="result" hidden>
+  <div class="stage-intro"><h2>Record the result</h2><p>Select what actually happened, then record the opposing team. Points will transfer and the next hand will open with new card counts.</p></div>
+  <div class="result-grid"><section class="panel">
   <div class="title-row"><h2>After a reveal</h2><span class="hint">Record actual outcome</span></div>
   <p class="description">Use this only when a sub-game ends. A recorded outcome updates both teams' points and the next hand's card counts.</p>
   <div class="fieldrow">
@@ -130,13 +154,8 @@
     <button class="ghost" id="undo-result">Undo latest result</button>
   </div>
   <div id="result-note" class="hint"></div>
-</section>
-<section class="panel">
-  <div class="title-row"><h2>Reference clock</h2><span class="hint">Not official game timer</span></div>
-  <div class="timer" id="timer">00:10</div>
-  <div class="fieldrow"><button data-timer="10">Reaction 10s</button><button data-timer="15">Claim 15s</button><button data-timer="30">Extension 30s</button><button id="timer-stop" class="ghost">Stop</button></div>
-  <p class="description">Teams have four +15 second extensions each round. The extension button shows the total 30-second window for one action.</p>
-</section>
+</section><section class="panel"><h2>Point transfer preview</h2><div id="result-summary" class="result-preview">Choose a final claim and outcome.</div><p class="description">You can undo the most recent recorded result. No result is added until you press Record result + next.</p></section></div>
+</div>
 <details class="panel guide"><summary>How to use every input, scoring and limits</summary>
   <p><strong>Round / sub-game:</strong> choose the current session. The overview says 8 sub-games per round; the detailed rules say 5. Ask the proctor which applies.</p>
   <p><strong>Latest claim:</strong> enter a type and the specified rank(s), using short notation or the claim builder. Full house uses trip rank first, pair rank second. Two pair uses high pair first. An SF or straight uses its top rank, and A-2-3-4-5 is 5-high.</p>
@@ -150,8 +169,6 @@
   <p><strong>Scoring:</strong> successful BLUFF takes 3 for low hands, 2 for full house / four, 1 for straight flush or above. Failed BLUFF pays claimant 1, 2, 3 respectively. Correct NUTS takes 4; incorrect NUTS pays 1.</p>
   <p><strong>Finals:</strong> the packet changes to two-life elimination without points/catch-up. This panel models regular scored rounds only.</p>
 </details>
-</div>
-</div>
 </main>
 <footer>All inputs stay in this browser. No competition connection, order submission, or Vercel deployment is used.</footer>
 </div>
