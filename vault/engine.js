@@ -58,7 +58,7 @@ export function numericLikelihood(trueValue,shown,type="unknown"){
 }
 export function roundedMean(a,b){return Math.floor((Number(a)+Number(b))/2+.5);}
 export function revealSchedule(elapsed,role){
-  const t=Math.max(0,Math.min(DURATION,Number(elapsed)||0));
+  const t=Math.max(0,Math.min(600,Number(elapsed)||0)); // Last reveal occurs at 10:00; none at round end.
   const publicPartial=[],publicTrue=[],privateTrue=[];
   for(let id=1;id<=20;id++){
     if(t>= (role==="taker"?id-1:id)*30)publicPartial.push(id);
