@@ -212,7 +212,13 @@ function suggestSymbolRule(target,symbol,field,doc){
  let node=target;
  for(let depth=0;node&&depth<14;node=node.parentElement,depth++){
    if(node===document.body||node===document.documentElement)break;
-   if(!node.contains?.(target)||recognizedRowSymbol(node)!==symbol)continue;
+   if(!node.contains?.(target))continue;
+   const located=recognizedRowSymbol(node);
+   if(located&&located!==symbol){
+     return {rule:null,verified:false,mismatch:true,
+       error:"Clicked value belongs to "+located+", not "+symbol+". Choose the correct instrument."};
+   }
+   if(located!==symbol)continue;
    const selectors=[];
    const tag=String(node.localName||node.tagName||"").toLowerCase();
    if(tag==="tr")selectors.push("tr");

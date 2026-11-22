@@ -317,4 +317,6 @@ test("picker refuses to claim another basket's row when clicked on a different s
  const ext=setup(),row=fakeRow("SAFE",401,402);
  const suggested=ext.suggestSymbolRule(row.children[1],"GRID","bid",domRows([row]));
  assert.equal(suggested.rule,null);
+ assert.equal(suggested.mismatch,true);
+ assert.match(suggested.error,/belongs to SAFE/);
 });

@@ -110,6 +110,9 @@ function beginPick(sym,field){
      extract.suggestSymbolRule(element,sym,field,document):null;
    const fallback=element?cssPath(element):null;
    cancelPick();
+   if(suggestion?.mismatch){
+     alert("Baskets reader: "+suggestion.error);return;
+   }
    if(!suggestion?.rule && !fallback){
      alert("Baskets reader: Cannot identify an accessible HTML field. Try a visible value or manual dynamic row selector.");return;
    }
