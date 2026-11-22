@@ -15,6 +15,7 @@ const required=[
   "baskets/index.html",
   "baskets/app.js",
   "baskets/engine.js",
+  "baskets/import.js",
   "baskets/styles.css",
   "baskets/README.md"
 ];

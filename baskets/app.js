@@ -3,6 +3,7 @@ import {
   capacities,validateBook,impliedIndices,settlement,indexExposure,inventoryStress,
   recommend,applyFill,projectedPnl,signed
 } from "./engine.js";
+import {parseMarketText,mergeMarketSnapshot} from "./import.js";
 
 const $=id=>document.getElementById(id);
 const KEY="quant-comp-baskets-v1";
@@ -60,6 +61,8 @@ function load(){
   return clean;
 }
 let state=load(),deadline=null,toaster,liveDecision=null,lastComputeTime=0;
+let bridgeActive=false,bridgeBusy=false,bridgeSequence=-1;
+let capturePositionSymbols=new Set();
 const round=()=>state.rounds[state.round];
 const book=()=>round().books[state.selected];
 const flow=()=>round().flow[state.selected];
@@ -81,6 +84,7 @@ function timerRender(){
 function chooseRound(index){
   elapsed();deadline=null;
   state.round=clamp(index,0,2);state.selected="GRID";
+  bridgeSequence=-1;capturePositionSymbols.clear();
   save();renderAll();
 }
 function toggleTimer(){
@@ -239,9 +243,142 @@ function renderFills(){
       (index===0?'<button id="undoFill" type="button">Undo last</button>':'')+
       '</div>').join("")+'</div>';
 }
+
+const QUICK_FIELDS=["bid","ask","position"];
+function quickEntryCell(sym,field) {
+  const val=round().books[sym]?.[field]??"";
+  const isPrice=field!=="position";
+  return '<input class="quick-input" aria-label="'+sym+' '+field+'" '+
+    'data-quick-sym="'+sym+'" data-quick-field="'+field+'" '+
+    'type="number" inputmode="'+(isPrice?"decimal":"numeric")+'" '+
+    'step="'+(isPrice?"0.5":"1")+'" '+
+    (isPrice?'min="0" max="800"':'min="-1000" max="1000"')+
+    ' placeholder="'+(isPrice?"—":"0")+'" value="'+escape(val)+'">';
+}
+function renderQuickGrid() {
+  $("quickBookGrid").innerHTML=
+    '<div class="quick-header"><span>BASKET</span><span>BID</span><span>ASK</span><span>POS</span></div>'+
+    SYMBOLS.map(sym=>
+      '<div class="quick-row"><button type="button" data-symbol="'+sym+
+      '" class="quick-symbol'+(state.selected===sym?" selected":"")+'">'+sym+'</button>'+
+      QUICK_FIELDS.map(key=>quickEntryCell(sym,key)).join("")+'</div>'
+    ).join("");
+}
+function syncMarketInputs(){
+  document.querySelectorAll("[data-quick-sym]").forEach(el=>{
+    const s=el.dataset.quickSym,key=el.dataset.quickField;
+    const v=String(round().books[s]?.[key]??"");
+    if(document.activeElement!==el && el.value!==v)el.value=v;
+  });
+  document.querySelectorAll(".quick-symbol").forEach(el=>
+    el.classList.toggle("selected",el.dataset.symbol===state.selected));
+  for(const key of ["bid","ask","bidSize","askSize","position","openBuys","openSells"]){
+    const input=$(key),v=String(book()[key]??"");
+    if(input&&document.activeElement!==input&&input.value!==v)input.value=v;
+  }
+}
+function previewPastedMarket(){
+  const parsed=parseMarketText($("marketPaste").value);
+  if(!$("marketPaste").value.trim()){
+    $("importPreview").textContent="Paste 1–3 basket rows. No existing value is changed until you click Apply.";
+    return parsed;
+  }
+  const valid=Object.keys(parsed.updates);
+  $("importPreview").textContent=parsed.errors.length?
+    parsed.errors.slice(0,2).join(" | "):
+    "Ready: "+valid.join(", ")+" • "+valid.map(s=>
+      s+" "+parsed.updates[s].bid+" / "+parsed.updates[s].ask).join(" • ");
+  $("importPreview").classList.toggle("warning",parsed.errors.length>0);
+  return parsed;
+}
+function applyMarketData(snapshot,source){
+  // Even an unchanged captured position must be marked as externally sourced,
+  // or recording a local fill can double-count real inventory.
+  if(source==="bridge"){
+    for(const sym of SYMBOLS){
+      if(snapshot.books?.[sym]?.position!==undefined)capturePositionSymbols.add(sym);
+    }
+  }
+  const updated=mergeMarketSnapshot(round().books,snapshot);
+  if(!updated.changed)return updated;
+  if(source!=="bridge"){
+    for(const sym of updated.updatedSymbols)capturePositionSymbols.delete(sym);
+  }
+  round().books=updated.books;save();
+  syncMarketInputs();renderDynamic();
+  return updated;
+}
+function applyPastedMarket(){
+  const result=previewPastedMarket();
+  if(!result.valid){toast(result.errors[0]||"Paste at least one valid market row.");return;}
+  const updated=applyMarketData({books:result.updates},"paste");
+  if(updated.changed)toast("Updated "+updated.updatedSymbols.join(", ")+".");
+  else toast("Those values are already current.");
+}
+function updateBridgeUI(status,detail,valid=false){
+  $("bridgeStatus").textContent=status;
+  $("bridgeStatus").classList.toggle("bridge-live",valid);
+  $("bridgeDetail").textContent=detail;
+}
+function bridgeAllowedHere(){
+  return location.protocol==="http:"&&["localhost","127.0.0.1"].includes(location.hostname);
+}
+async function pollBridge(){
+  if(!bridgeActive||bridgeBusy)return;
+  bridgeBusy=true;
+  try{
+    const key=$("bridgeKey").value.trim();
+    const response=await fetch("http://127.0.0.1:8765/snapshot",{
+      cache:"no-store",headers:{"x-bridge-key":key},
+      signal:AbortSignal.timeout(1800)
+    });
+    if(!bridgeActive)return;
+    if(!response.ok){
+      updateBridgeUI(response.status===401?"BAD KEY":"BRIDGE ERROR",
+        "Local server returned status "+response.status+". Check the session key.");
+      return;
+    }
+    const result=await response.json();
+    if(result.stale||!result.snapshot){
+      updateBridgeUI("AWAITING GAME",
+        "Bridge connected, but there is no recent mapped data. Open the competition tab and start the extension.");
+      return;
+    }
+    const age=(result.ageMs/1000).toFixed(1);
+    const host=result.snapshot.host||"game page";
+    updateBridgeUI("CAPTURING","Data from "+host+" · "+age+"s old. Prices and mapped positions refresh automatically.",true);
+    if(result.seq!==bridgeSequence){
+      bridgeSequence=result.seq;
+      applyMarketData(result.snapshot,"bridge");
+    }
+  }catch(error){
+    if(bridgeActive)updateBridgeUI("BRIDGE OFFLINE",
+      "Cannot reach local server on 127.0.0.1:8765. Run node baskets/bridge/server.mjs.");
+  }finally{bridgeBusy=false;}
+}
+function connectBridge(){
+  if(!bridgeAllowedHere()){
+    updateBridgeUI("LOCAL ONLY","Open this panel at http://localhost:8000/baskets/. Remote HTTPS cannot read the local bridge.");
+    return;
+  }
+  if(!/^[a-f0-9]{36}$/i.test($("bridgeKey").value.trim())){
+    toast("Paste the 36-character session key printed by the bridge server.");return;
+  }
+  bridgeActive=true;bridgeSequence=-1;
+  $("connectBridge").disabled=true;$("disconnectBridge").disabled=false;
+  updateBridgeUI("CONNECTING","Checking the local bridge...");
+  pollBridge();
+}
+function disconnectBridge(){
+  bridgeActive=false;capturePositionSymbols.clear();bridgeSequence=-1;
+  $("connectBridge").disabled=false;$("disconnectBridge").disabled=true;
+  updateBridgeUI("NOT CONNECTED","Capture stopped. Manual quick-entry controls still work.");
+}
+setInterval(pollBridge,700);
+
 function renderAll(){
   $("roundButtons").innerHTML=[0,1,2].map(i=>'<button data-round="'+i+'" class="'+(i===state.round?'active':'')+'">'+(i+1)+'</button>').join("");
-  fields();
+  fields();renderQuickGrid();
   $("sizePresets").innerHTML=[10,25,50,100,200].map(n=>
     '<button type="button" data-size="'+n+'" class="'+(state.maxOrder===n?'selected':'')+'">'+n+'</button>').join("");
   renderFlow();renderFills();renderDynamic();timerRender();
@@ -251,6 +388,7 @@ function renderDynamic(){
     risk:state.risk,seconds:round().clock,maxOrder:state.maxOrder,observations:round().snapshots});
   renderSymbols(d);renderIndices(d.fair,round().books);renderBooks(d);
   renderDecision(d);renderTactics(d);renderPortfolio(d);
+  syncMarketInputs();
   lastComputeTime=Date.now();
 }
 function addVolume(n){
@@ -291,6 +429,10 @@ function fillDraft(action){
   toast("Order draft filled. Place the LIMIT order in the exchange first.");
 }
 function recordFill(){
+  if(bridgeActive&&capturePositionSymbols.has(state.selected)){
+    toast("Live position sync is active for this basket. Disable its position mapping or disconnect before manual fill logging.");
+    return;
+  }
   const qty=Number($("fillQty").value),price=Number($("fillPrice").value);
   const previous={...book()};
   try{
@@ -323,10 +465,19 @@ function showHelp(name){
 }
 document.addEventListener("input",event=>{
   const el=event.target;
-  if(el.dataset.book!==undefined){
+  if(el.dataset.quickSym!==undefined){
+    const sym=el.dataset.quickSym,key=el.dataset.quickField;
+    round().books[sym][key]=el.value;
+    if(key==="position")round().books[sym].ledgerComplete=false;
+    capturePositionSymbols.delete(sym);
+    save();renderDynamic();
+  }else if(el.id==="marketPaste"){
+    previewPastedMarket();
+  }else if(el.dataset.book!==undefined){
     const key=el.dataset.book;
     book()[key]=el.value;
     if(key==="position")book().ledgerComplete=false;
+    capturePositionSymbols.delete(state.selected);
     save();renderDynamic();
   }else if(el.dataset.setting!==undefined){
     updateSetting(el.dataset.setting,el.value);
@@ -335,6 +486,14 @@ document.addEventListener("input",event=>{
 document.addEventListener("change",event=>{
   const el=event.target;
   if(el.id==="bid"||el.id==="ask")captureSnapshot(true);
+  if(el.dataset.quickField==="bid"||el.dataset.quickField==="ask"){
+    const sym=el.dataset.quickSym;
+    const b=round().books[sym];const q=validateBook(b);
+    if(q.valid && !round().snapshots.some(x=>x.sym===sym&&x.mid===q.mid)){
+      round().snapshots.push({sym,mid:q.mid,spread:q.spread,at:Date.now()});
+      round().snapshots=round().snapshots.slice(-50);save();renderDynamic();
+    }
+  }
   if(el.dataset.setting==="maxOrder"){
     $("maxOrder").value=state.maxOrder;
     $("sizePresets").querySelectorAll("button").forEach(b=>b.classList.toggle("selected",Number(b.dataset.size)===state.maxOrder));
@@ -350,6 +509,14 @@ document.addEventListener("click",async e=>{
   if(btn.dataset.flow!==undefined)return addVolume(Number(btn.dataset.flow));
   if(btn.dataset.size!==undefined){state.maxOrder=Number(btn.dataset.size);save();$("maxOrder").value=state.maxOrder;renderAll();return;}
   if(btn.dataset.fillSide!==undefined){state.fillSide=btn.dataset.fillSide;save();renderFills();return;}
+  if(btn.id==="connectBridge")return connectBridge();
+  if(btn.id==="disconnectBridge")return disconnectBridge();
+  if(btn.id==="applyMarketPaste")return applyPastedMarket();
+  if(btn.id==="pasteClipboard"){
+    try{$("marketPaste").value=await navigator.clipboard.readText();applyPastedMarket();}
+    catch{toast("Clipboard unavailable. Paste into the text box instead.");}
+    return;
+  }
   if(btn.id==="timerButton")return toggleTimer();
   if(btn.id==="timerReset")return resetTimer();
   if(btn.id==="undoFlow")return undoVolume();
@@ -370,6 +537,9 @@ document.addEventListener("click",async e=>{
   if(btn.id==="undoFill")return undoFill();
 });
 document.addEventListener("keydown",event=>{
+  if((event.ctrlKey||event.metaKey)&&event.key==="Enter"&&document.activeElement===$("marketPaste")){
+    event.preventDefault();applyPastedMarket();return;
+  }
   if(event.altKey&&!event.shiftKey&&!event.ctrlKey&&!event.metaKey){
     if(["1","2","3"].includes(event.key)){event.preventDefault();setSelected(SYMBOLS[Number(event.key)-1]);}
     if(event.key==="Enter"){event.preventDefault();if(liveDecision?.best)fillDraft(liveDecision.best);}

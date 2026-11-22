@@ -1,5 +1,5 @@
 /* Static panel cache: only small, public UI assets. Never caches user inputs. */
-const CACHE = "quant-comp-panels-2026-v3";
+const CACHE = "quant-comp-panels-2026-v4";
 const ASSETS = [
   "./index.html",
   "./scavenger/index.html",
@@ -9,7 +9,8 @@ const ASSETS = [
   "./baskets/index.html",
   "./baskets/styles.css",
   "./baskets/app.js",
-  "./baskets/engine.js"
+  "./baskets/engine.js",
+  "./baskets/import.js"
 ];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))

@@ -21,6 +21,62 @@ npm test
 
 The site build includes these files as a separate panel, but **automatic Vercel deployments are paused** by the project settings and root \`vercel.json\`. No deployment is needed to use this updated code locally.
 
+## Faster entry and optional automatic reading
+
+The Baskets panel now has **three complementary input modes**. All three update the same local fair-value engine and keep data saved in your browser.
+
+### 1. One-screen quote grid (fastest fallback)
+
+The top-left **All three baskets** grid displays GRID, CURE and SAFE together. Each row shows **Bid**, **Ask**, and your signed **Position**. Move from field to field with Tab. Inputs immediately update the recommendation. All other fields, such as displayed sizes or working orders, remain in the detailed basket tab.
+
+### 2. Paste three quote rows
+
+Open **Paste quotes from a table or clipboard** and paste:
+
+\`\`\`text
+GRID 399.5 400.5 100 80 0
+CURE 398.5 400.0 55 70 -25
+SAFE 401.0 402.0 90 85 40
+\`\`\`
+
+Columns are \`SYMBOL BID ASK [BID_SIZE ASK_SIZE POSITION]\`, with brackets meaning the final three fields are optional. A minimal quote row such as \`GRID 399.5 400.5\` is valid. Additional optional columns \`OPEN_BUYS OPEN_SELLS\` are supported after position, for seven numbers total. You can also paste labeled lines such as \`GRID bid 399.5 ask 400.5 position -25\`. A simple copied CSV with a \`symbol,bid,ask,...\` header is recognized.
+
+Press **Apply checked rows**, **Read clipboard & apply**, or Ctrl+Enter while the paste box is focused. The parser validates all rows, price ticks and positions. It rejects malformed or crossed markets rather than silently inventing data. Imported lines never modify event-bot volumes.
+
+### 3. Chrome read-only DOM adapter (requires matching the actual game)
+
+The event rules packet gives the settlement mathematics and orderbook rules, **but does not specify the game URL, API, WebSocket, HTML fields or a supported automated data feed**. Therefore the adapter can be prepared in advance, but its selectors must be mapped and tested once the competition website is available. It does **not** read a canvas-only interface or undocumented internal exchange traffic.
+
+This adapter uses a zero-dependency loopback bridge and a locally loaded Chrome extension. It reads only user-selected, visible numeric fields from the game tab and sends them to your local Baskets panel. It does **not** access account credentials, submit trades, place orders, click the exchange, or send captured data to Vercel or any external host.
+
+**Step A: Start the local panel and bridge.** From the repository root, open two terminals:
+
+\`\`\`bash
+# terminal 1: local Baskets website
+python -m http.server 8000
+\`\`\`
+
+\`\`\`bash
+# terminal 2: one-time local capture session
+node baskets/bridge/server.mjs
+\`\`\`
+
+The bridge listens on \`127.0.0.1:8765\` and prints a **fresh 36-character session key**. Keep that terminal open. The key is required for both sending and reading snapshots, so random web pages cannot use your local feed.
+
+**Step B: Load the extension locally.** In Chrome visit \`chrome://extensions\`, turn on Developer mode, choose **Load unpacked**, then select \`baskets/bridge/extension/\` from your local repository folder. This is a source-only Chrome extension, not a store install. Its site permission is the game tab you explicitly activate plus the local bridge.
+
+**Step C: Map the game's visible numeric fields.** Open the actual Baskets trading page, then click the **Baskets Local Market Reader** extension button. Paste the bridge session key and save. For each GRID, CURE and SAFE, click **Pick** next to **Bid**, then click the visible best-bid number in the actual game. Repeat for **Ask**, for six selections in total. If useful, map quote sizes, your positions and working-order sizes. The extension stores those CSS selectors locally for that website. You may type/edit a CSS selector instead of picking it.
+
+Click **Start / refresh capture** in the extension. Keep the game tab open.
+
+**Step D: Connect the strategy panel.** Open \`http://localhost:8000/baskets/\`, paste the same bridge key in **Game tab capture**, and click **Connect**. The panel will poll the relay roughly every 700 ms, merge only fields supplied by the extension, and show **CAPTURING**, **AWAITING GAME**, or **BRIDGE OFFLINE**. Chrome may throttle background tabs, so a data-age indicator distinguishes a fresh feed from stale data. There is an explicit **Stop** button.
+
+**What is and is not automatic:** Visible best bids, best asks, displayed sizes, positions and open-order totals can auto-update *if and only if you successfully map their DOM elements and the site exposes them as text or input values*. The competition packet does not promise that event-bot orders carry identifying labels. Event flow therefore remains a manual, explicitly classified input. Public trade volume must never be silently treated as confirmed event-bot volume.
+
+**Inventory caution:** If the extension reads your live position, the tool will not let you also log a manual fill for that basket while the connection is active, because that would double-count a position already updated by the exchange. The historical PnL estimate stays unavailable if inventory was imported without its complete transaction history.
+
+**Security and limits:** The bridge binds to loopback only. It accepts only mapped numeric values for known basket fields, rejects other data, enforces a per-session secret, does not retain captures on disk, and forgets them when the server stops. The extension's only external host permission is \`127.0.0.1:8765\`. The actual game domain does not require blanket host permissions. Some games prohibit browser extensions or automation in their competition rules; confirm that read-only capture is permitted before using it during scored play. The adapter has not been integration-tested against the competition's actual trading UI because its URL and markup were not provided.
+
 ## Fast game workflow
 
 1. Choose **Round 1**, **2** or **3** and start the optional 10-minute local countdown. Switch between the **GRID**, **CURE**, and **SAFE** tabs with a tap or Alt+1, Alt+2, Alt+3.

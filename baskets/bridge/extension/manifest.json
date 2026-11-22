@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "Baskets Local Market Reader",
+  "version": "0.1.0",
+  "description": "Read-only field picker for the Baskets competition panel. Sends selected visible numbers to 127.0.0.1 only.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://127.0.0.1:8765/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}

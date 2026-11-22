@@ -16,7 +16,7 @@
       <div class="logo">Q</div>
       <div><span class="eyebrow">WQC 2026 · GAME 02</span><h1>Baskets</h1></div>
     </div>
-    <div class="local-status"><i></i> LOCAL DECISION ENGINE <span>NO LIVE FEED</span></div>
+    <div class="local-status"><i></i> LOCAL DECISION ENGINE <span>OPTIONAL LOCAL CAPTURE</span></div>
   </header>
   <section class="toolbar">
     <div class="round-switch"><div class="overline">ROUND</div><div id="roundButtons" class="round-buttons"></div></div>
@@ -29,6 +29,41 @@
   </section>
   <main class="main-grid">
     <div class="left-col">
+      <section class="panel quick-panel" aria-labelledby="quickTitle">
+        <div class="sectionheading"><div><span class="eyebrow">ONE-SCREEN ENTRY</span><h2 id="quickTitle">All three baskets</h2></div><span class="smalltag">TAB THROUGH FIELDS</span></div>
+        <p class="hint quick-intro">Enter the best bid, best ask and your filled position in one grid. Changes update recommendations immediately.</p>
+        <div id="quickBookGrid" class="quick-market-grid"></div>
+        <details class="guide" id="pasteGuide">
+          <summary>Paste quotes from a table or clipboard</summary>
+          <div class="guide-body">
+            <p>Copy or type one row per basket in this order: <strong>SYMBOL BID ASK</strong>. Optional extra columns: <strong>BID SIZE ASK SIZE POSITION</strong>. Example:</p>
+            <code class="paste-example">GRID 399.5 400.5 100 80 0
+CURE 398.5 400.0 55 70 -25
+SAFE 401.0 402.0 90 85 40</code>
+            <p>You can also paste labeled rows such as <strong>GRID bid 399.5 ask 400.5 position 25</strong>. Invalid rows are rejected rather than guessed.</p>
+            <textarea id="marketPaste" rows="4" spellcheck="false" placeholder="GRID 399.5 400.5&#10;CURE 398.5 400&#10;SAFE 401 402"></textarea>
+            <div id="importPreview" class="hint">Paste a table to preview it.</div>
+            <div class="inline-row"><button id="applyMarketPaste" class="button secondary">Apply checked rows</button><button id="pasteClipboard" class="button ghost">Read clipboard &amp; apply</button></div>
+          </div>
+        </details>
+      </section>
+      <section class="panel auto-panel" aria-labelledby="autoTitle">
+        <div class="sectionheading"><div><span class="eyebrow">OPTIONAL AUTOMATION</span><h2 id="autoTitle">Game tab capture</h2></div><span id="bridgeStatus" class="smalltag">NOT CONNECTED</span></div>
+        <p class="hint">A local Chrome extension can read visible game values after you map the fields. Nothing here submits orders. Event-bot flow still requires reliable identification.</p>
+        <div class="bridge-connect">
+          <input type="password" id="bridgeKey" placeholder="Paste local bridge session key" autocomplete="off" aria-label="Local bridge session key">
+          <button type="button" class="button secondary" id="connectBridge">Connect</button>
+          <button type="button" class="button ghost" id="disconnectBridge" disabled>Stop</button>
+        </div>
+        <div id="bridgeDetail" class="hint spaced">To prepare automatic capture, run the local bridge and load the Chrome extension in baskets/bridge/extension. The extension maps visible DOM numbers.</div>
+        <details class="guide"><summary>Set up automatic read-only capture</summary><div class="guide-body">
+          <p>1. Run <strong>node baskets/bridge/server.mjs</strong> from your repository root. Copy the 36-character session key printed in your terminal.</p>
+          <p>2. Open <strong>chrome://extensions</strong>, enable Developer mode, and select <strong>Load unpacked</strong>. Choose the <strong>baskets/bridge/extension</strong> folder.</p>
+          <p>3. Open the actual Baskets trading tab. Open the extension, enter the key, then choose <strong>Pick</strong> for each GRID/CURE/SAFE bid and ask. Click the displayed value on the game page. Start capture.</p>
+          <p>4. In this local Baskets panel, paste the same key and click Connect. Current mapped prices and optional inventory refresh automatically. You can still record event-bot volume manually.</p>
+          <p>The game interface is not yet available for us to inspect, so CSS field mapping must be confirmed on the actual page. If the interface renders values only on a canvas, this DOM adapter cannot read them without further work.</p>
+        </div></details>
+      </section>
       <section class="panel" aria-labelledby="booksTitle">
         <div class="sectionheading"><div><span class="eyebrow">MARKET MONITOR</span><h2 id="booksTitle">Select a basket</h2></div><span class="smalltag">3 ORDERBOOKS</span></div>
         <div id="symbolButtons" class="market-tabs" role="group" aria-label="Choose basket"></div>
@@ -126,7 +161,7 @@
       </section>
     </aside>
   </main>
-  <footer>WQC GAME 02 <span>·</span> Manual inputs, local decisions. No exchange API, no Vercel redeployments needed.</footer>
+  <footer>WQC GAME 02 <span>·</span> Quick manual entry and optional read-only local capture. No order submission or Vercel deployment.</footer>
 </div>
 <div id="toast" class="toast" role="status"></div>
 <script type="module" src="./app.js"></script>

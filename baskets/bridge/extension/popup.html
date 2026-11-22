@@ -1,0 +1,23 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Baskets local reader</title>
+<style>
+*{box-sizing:border-box}body{width:410px;max-height:560px;overflow:auto;background:#0c111b;color:#ecf5fd;font:12px/1.45 system-ui;margin:0;padding:16px}h1{font-size:18px;margin:0}h2{font-size:14px;margin:15px 0 6px}p{color:#a8b8c7;margin:7px 0 12px}.tag{color:#72dfc4;font-size:10px;font-weight:750;letter-spacing:.07em}input{background:#172537;border:1px solid #3f5569;padding:9px;color:#fff;border-radius:6px;min-width:0;width:100%;font:inherit}input:focus,button:focus-visible{outline:2px solid #72dfc4}button{font:inherit;border:1px solid #476173;background:#203348;color:#f2f7fb;border-radius:6px;padding:8px 10px;cursor:pointer;font-weight:700}button.main{background:#71dfc4;color:#073127;border-color:#71dfc4}button.pick{color:#71dfc4;font-size:11px}button:disabled{opacity:.45}button:hover{filter:brightness(1.1)}.row{display:flex;gap:8px;margin:9px 0;align-items:center}.row input{flex:1}.note{border:1px solid #304559;border-radius:7px;padding:9px;background:#101c2a;color:#aabcc9}.ok{color:#78e2c8}.bad{color:#fdaab0}.mapping{display:grid;gap:7px}.mapping-row{display:grid;grid-template-columns:48px 68px 1fr 45px;gap:6px;align-items:center}.mapping-row strong{color:#71dfc4;font-size:11px}.mapping-row label{font-size:11px;color:#b7c5d1}.mapping-row input{padding:6px;font-size:11px}.mapping-row button{padding:7px 4px;font-size:11px}.section{border-top:1px solid #293949;padding-top:11px;margin-top:13px}details{margin-top:12px}summary{color:#71dfc4;cursor:pointer}#status{font-size:11px;margin:8px 0}small{color:#8da0b6}</style>
+</head><body>
+<div class="tag">READ-ONLY / LOCALHOST ONLY</div><h1>Baskets market reader</h1>
+<p>Open the actual game page, then map its visible numbers once. No trades or form inputs are touched.</p>
+<div id="tabName" class="note">Checking this browser tab...</div>
+<div class="section"><h2>1. Local bridge session key</h2>
+<p>Run <code>node baskets/bridge/server.mjs</code> from the repository. Paste the key it prints here and into the Baskets panel.</p>
+<div class="row"><input type="password" id="bridgeKey" autocomplete="off" placeholder="36-character local session key"><button id="saveKey">Save key</button></div>
+<div id="status">Checking bridge...</div>
+</div>
+<div class="section"><h2>2. Select fields on the actual game page</h2>
+<p>Click Pick, then click the matching number in the game. The game click is intercepted during picking. Only mapped numbers are transmitted.</p>
+<div id="essential" class="mapping"></div>
+<details><summary>Optional sizes, inventory and working orders</summary><div id="advanced" class="mapping"></div></details>
+</div>
+<div class="section"><h2>3. Start read-only capture</h2>
+<div class="row"><button class="main" id="start">Start / refresh capture</button><button id="stop">Stop</button></div>
+<small>Chrome must allow this extension on the competition page. If the game uses canvas instead of text elements, DOM capture will require a different adapter.</small>
+</div>
+<script src="popup.js"></script></body></html>
