@@ -35,6 +35,7 @@ jobs:
       - run: node --check import.js
       - run: node --check bridge/server.mjs
       - run: node --check bridge/extension/background.js
+      - run: node --check bridge/extension/field-extract.js
       - run: node --check bridge/extension/capture.js
       - run: node --check bridge/extension/popup.js
       - run: node -e "JSON.parse(require('node:fs').readFileSync('bridge/extension/manifest.json','utf8'))"

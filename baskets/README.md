@@ -2,7 +2,7 @@
 
 Game 2 of the Waterloo Quant Club Fall 2026 Trading Competition. Source: the official competition packet, pages 8–9. A team of two trades three baskets for three 10-minute rounds; each round has six teams in a room. Rooms shuffle between rounds.
 
-The panel works on mobile and desktop and makes local, synchronous recommendations. It has no server, financial data feed, event-bot identifier, or exchange connection. **You must enter quotes, signed flow, actual fills and open-order sizes yourself.** It does not submit actual orders.
+The panel works on mobile and desktop and makes local, synchronous recommendations. It has no official exchange API, reliable event-bot identifier, or order-submission connection. You can enter quotes manually or enable optional read-only browser capture after mapping the actual game interface. Event-bot classification and trades remain manual. It does not submit orders.
 
 ## Run locally
 
@@ -65,7 +65,13 @@ The bridge listens on \`127.0.0.1:8765\` and prints a **fresh 36-character sessi
 
 **Step B: Load the extension locally.** In Chrome visit \`chrome://extensions\`, turn on Developer mode, choose **Load unpacked**, then select \`baskets/bridge/extension/\` from your local repository folder. This is a source-only Chrome extension, not a store install. Its site permission is the game tab you explicitly activate plus the local bridge.
 
-**Step C: Map the game's visible numeric fields.** Open the actual Baskets trading page, then click the **Baskets Local Market Reader** extension button. Paste the bridge session key and save. For each GRID, CURE and SAFE, click **Pick** next to **Bid**, then click the visible best-bid number in the actual game. Repeat for **Ask**, for six selections in total. If useful, map quote sizes, your positions and working-order sizes. The extension stores those CSS selectors locally for that website. You may type/edit a CSS selector instead of picking it.
+**Step C: Map the game's visible numeric fields.** Open the actual Baskets trading page, then click the **Baskets Local Market Reader** extension button. Paste the bridge session key and save. For each GRID, CURE and SAFE, click **Pick** next to **Bid**, then click the visible best-bid number in the actual game. Repeat for **Ask**, for six selections in total. If useful, map quote sizes, your positions and working-order sizes. The extension stores field extraction rules locally for that website. You may type/edit a CSS selector instead of picking it.
+
+**Verify every mapped value before capture.** Reopen the extension and click **Check** beside a field, or **Check all six bid/ask fields**. The preview shows exactly which numeric value would be read. A selector that matches several rows, or an element with several numbers, is intentionally *ambiguous* and will not be captured until you specify its index.
+
+For example, suppose a single container displays `GRID Bid $399.50 Ask $400.50 Size 100`. Select that container as the Bid field, set **Number # = 1**, and click Check. For the Ask field, use the same selector but choose **Number # = 2**. If `.price` matches a list of prices, choose **Element #** as well (1 = first matching element, 2 = second). If numbers are stored in an HTML attribute instead of text, enter the attribute name, for example `aria-label` or `data-price`. Blank number and element indices mean automatic selection only when there is exactly one possible match.
+
+If a selected element or numbered value disappears as the page updates, capture of that particular field stops rather than falling back silently to another number. Recheck mappings if the competition UI changes. Chrome's picker handles ordinary DOM elements only. It does not currently traverse canvas graphics, closed shadow roots or inaccessible iframe content. Those interfaces require another, separately tested adapter.
 
 Click **Start / refresh capture** in the extension. Keep the game tab open.
 
