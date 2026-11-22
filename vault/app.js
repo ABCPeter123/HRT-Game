@@ -196,7 +196,8 @@ function marketInputs(){
  SYMBOLS.map(sym=>{
   const b=r().books[sym];
   return '<div class="market-row"><strong>'+sym+'</strong>'+[
-    ["bid",b.bid],["ask",b.ask],["bidSize",b.bidSize],["askSize",b.askSize],["position",b.position]
+    ["bid",b.bid],["ask",b.ask],["bidSize",b.bidSize],["askSize",b.askSize],["position",b.position],
+    ["workingBuys",b.workingBuys],["workingSells",b.workingSells]
   ].map(([field,value])=>'<input data-sym="'+sym+'" data-field="'+field+'" aria-label="'+sym+' '+field+
       '" type="number" inputmode="'+(["bid","ask"].includes(field)?"decimal":"numeric")+
       '" value="'+esc(value)+'" step="'+(["bid","ask"].includes(field)?SPECS[sym].tick:1)+'">').join("")+'</div>';
