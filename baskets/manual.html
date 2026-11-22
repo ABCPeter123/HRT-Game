@@ -1,0 +1,70 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0d1320"><meta name="description" content="Baskets trading desk step-by-step user manual and two-person teammate execution guide."><title>Baskets user manual | Quant Comp 2026</title><link rel="stylesheet" href="../manual.css"></head><body><div class="shell"><header class="sitebar"><a href="./">← Back to Baskets panel</a><small>QUANT COMP 2026 / GAME 02 / OPERATING MANUAL</small></header><div class="hero"><div class="eyebrow">LIVE OPERATIONS GUIDE</div><h1>Baskets user manual</h1><p class="lead">Use the execution desk as a two-person trading loop: you read signals and issue a numbered instruction; your teammate places the order and reports what actually happened.</p><div class="manual-meta"><span>2-person team</span><span>3 rounds · 10 minutes each</span><span>GRID / CURE / SAFE</span></div><div class="hero-actions"><a class="button primary" href="./">Open Baskets panel</a><a class="button" href="./README.md">Strategy and game rules</a><a class="button" href="#" onclick="window.print();return false;">Print guide</a></div></div><div class="layout"><nav class="toc" aria-label="Manual sections"><strong>IN THIS GUIDE</strong><a href="#quick">60-second overview</a><a href="#setup">Before you start</a><a href="#roles">Two-person workflow</a><a href="#steps">Exact operating steps</a><a href="#calls">Execution protocol</a><a href="#recover">Errors and recovery</a><a href="#finish">End-of-round checklist</a></nav><main><section class="manual-section" id="quick"><div class="kicker">AT A GLANCE</div><h2>The operator loop</h2>
+<div class="twocol"><div class="role"><div class="tag">YOU · DESK OPERATOR</div><h3>Observe, compute, call</h3><p>Run the panel; enter or capture GRID, CURE and SAFE bids/asks; assess event-volume evidence; send one numbered instruction; record the teammate's status. You own the decision and risk checks.</p></div><div class="role"><div class="tag">TEAMMATE · EXCHANGE EXECUTOR</div><h3>Place, verify, report</h3><p>Run the actual game interface. Submit the exact limit order, check that the exchange accepted it, watch partial/full fills, and report the <strong>same call ID</strong> plus cumulative executed quantity and average price. Never assume a queued call is already an order.</p></div></div>
+<p><strong>Order cycle:</strong> market data → recommendation → <strong>Copy instruction + queue call</strong> → teammate confirms/places → teammate reports status → <strong>Apply teammate report</strong> → review new exposure and reprice.</p></section>
+<section class="manual-section" id="setup"><div class="kicker">BEFORE TRADING</div><h2>Open both systems and set the desk</h2>
+<ol class="steps">
+<li><strong>Start the local panel.</strong> In the project root run <code>python -m http.server 8000</code>, then open <code>http://localhost:8000/baskets/</code>. Keep this on your screen; your teammate uses the real Baskets exchange. The manual works without any extension.</li>
+<li><strong>Agree on your communication channel.</strong> Sit side by side and read each instruction aloud, or paste it in a team chat. Use the panel-generated call ID to keep instructions unique. Decide that your teammate must acknowledge a call before placing it.</li>
+<li><strong>Select Round 1 and start the optional timer.</strong> Use the numbered round buttons. The <strong>Start</strong> timer is a local 10-minute reference, not the exchange deadline.</li>
+<li><strong>Choose your quote-input method.</strong> For manual entry, open <strong>Market analysis / setup</strong> and fill the <strong>All three baskets</strong> grid. For clipboard entry, expand <strong>Paste quotes from a table or clipboard</strong>, check the preview, and click <strong>Apply checked rows</strong>.</li>
+</ol>
+<h3>Optional read-only automatic data capture</h3>
+<ol class="steps">
+<li><strong>Run the bridge in another terminal.</strong> Execute <code>node baskets/bridge/server.mjs</code>. Keep it open and copy its fresh 36-character session key.</li>
+<li><strong>Install the Baskets reader.</strong> In Chrome open <code>chrome://extensions</code>, enable Developer mode, select <strong>Load unpacked</strong>, and choose <code>baskets/bridge/extension</code>. Reload it if installed previously.</li>
+<li><strong>Map actual exchange values.</strong> Open the real Baskets game tab, click the reader popup, enter the key, then use <strong>Pick</strong> on each GRID, CURE and SAFE bid/ask. Prefer <strong>Follow GRID/CURE/SAFE dynamically</strong>, selecting a stable row selector and <strong>Label or table heading</strong> so changing row/column order cannot silently swap symbols. Check all six essential fields; optional sizes and positions can also be mapped.</li>
+<li><strong>Start capture and connect the panel.</strong> Click <strong>Start / refresh capture</strong> in the extension. In <strong>Market analysis / setup → Game tab capture</strong>, paste the same key and click <strong>Connect</strong>. Verify at least two displayed prices against the real exchange. The adapter reads selected visible DOM numeric values only; canvas-only values may need manual entry.</li>
+</ol>
+<div class="note">The bridge is read-only, localhost-only, and optional. It neither reads hidden information nor sends orders. Captured position fields and manual fill records must not both update the same exposure; the panel guards against double counting when the bridge owns a field.</div></section>
+<section class="manual-section" id="roles"><div class="kicker">TEAM OF TWO</div><h2>Who looks at which screen</h2>
+<table><thead><tr><th>Moment</th><th>You: decision desk</th><th>Teammate: real exchange</th></tr></thead><tbody>
+<tr><td>Before first trade</td><td>Select round, verify market feed and risk limit.</td><td>Open GRID/CURE/SAFE orderbooks and confirm ready.</td></tr>
+<tr><td>At signal</td><td>Check expected edge, size, position and order validity; copy a numbered call.</td><td>Repeat back symbol, side, shares and limit price; place only after verifying.</td></tr>
+<tr><td>After submission</td><td>Update call to ACK or WORKING based on the report.</td><td>Report accepted or rejected, including any partial fill.</td></tr>
+<tr><td>When price moves</td><td>Review <strong>Price alerts</strong> and classify only observed evidence.</td><td>Look at exchange prints/orderbook; report trade direction and actually observed volume if known.</td></tr>
+<tr><td>At round end</td><td>Reconcile call queue, positions and PnL estimate.</td><td>Confirm outstanding orders, actual fills, and official round end.</td></tr></tbody></table></section>
+<section class="manual-section" id="steps"><div class="kicker">LIVE ROUND</div><h2>Exact panel controls in play order</h2>
+<ol class="steps">
+<li><strong>Fill market observations.</strong> Open <strong>Market analysis / setup</strong>. Enter best bid, best ask, and (if available) displayed bid/ask size for each of GRID, CURE, SAFE. Enter signed <strong>Position</strong> and unfilled <strong>Working buy shares</strong>/<strong>Working sell shares</strong>, unless those fields are coming from the verified bridge. Bid/ask prices must use $0.50 ticks and remain within $0–$800.</li>
+<li><strong>Confirm the modeled settlement basis.</strong> In <strong>Market analysis / setup</strong>, look at <strong>Index values</strong> and the selected basket's <strong>Fair price</strong>. GRID = TEK + NRG, CURE = TEK + MED, SAFE = NRG + MED; all three underlying indices start at $200.</li>
+<li><strong>Record only valid event information.</strong> Under <strong>Log directional volume</strong>, choose <strong>Confirmed event</strong> only if you actually know the flow came from an event bot and have its signed trade quantity. Choose <strong>Suspected event</strong> for uncertain bursts, or <strong>Public tape</strong> for ordinary trading. Ordinary tape does not determine settlement. Correct an error using <strong>Undo</strong>.</li>
+<li><strong>Read the live action.</strong> Return to <strong>Execution desk</strong>. If it says <strong>HOLD</strong>, do not invent an order. Otherwise check BUY/SELL, instrument, exact limit price and shares. Verify sufficient capacity after all outstanding orders, not merely after current fills.</li>
+<li><strong>Queue the handoff.</strong> Click <strong>Copy instruction + queue call</strong>. Read or paste the instruction, including the generated ID such as <code>R1-001</code>. The call is recorded locally but <strong>not sent to the exchange</strong>.</li>
+<li><strong>Receive status.</strong> Your teammate places the order in the actual exchange, then reports the call ID and one of ACK, WORKING, PARTIAL, FILLED, CANCELLED or REJECTED. Paste the reply into <strong>Record execution status</strong>, then click <strong>Apply teammate report</strong>. Use <strong>Undo last local status</strong> if you misrecord a report.</li>
+<li><strong>Review repricing.</strong> Visit <strong>Price alerts</strong> when the badge shows pending alerts. Select the alert, choose <strong>Review and classify</strong>, and enter confirmed signed executed volume only if known. Sharp midpoint moves alone are not proof of event-bot activity.</li>
+<li><strong>Update or exit.</strong> With new quotes, fills or alerts, repeat the cycle. Use the round buttons only when the real game moves to the next 10-minute round. The dashboard keeps separate data for three rounds.</li>
+</ol></section>
+<section class="manual-section" id="calls"><div class="kicker">CALL/REPORT FORMAT</div><h2>Precise handoff protocol</h2>
+<p>Use these exact examples with <strong>cumulative</strong> quantities. Prices below are examples, not real-time quotes.</p>
+<pre><code>DESK → TEAMMATE
+R1-001 BUY 20 GRID LIMIT @ 399.50
+Verify current ask and capacity before entry.
+
+TEAMMATE → DESK
+R1-001 ACK
+R1-001 WORKING
+R1-001 PARTIAL 8 @ 399.50
+R1-001 FILLED 20 @ 399.50</code></pre>
+<p>The second fill report means <strong>20 total shares filled</strong>, not 20 additional shares. If the actual cumulative average price differs, report that exact average rather than the original limit. The tool uses the delta from the previous report so repeat messages don't create duplicate fills.</p>
+<div class="note caution"><strong>Cancellation and replacement:</strong> Never send a second conflicting instruction merely because a quote moved. Ask your teammate to confirm the existing order's current status first. Mark it CANCELLED only after exchange confirmation. For a rejected order, record REJECTED rather than WORKING.</div>
+<h3>Directional alert decision tree</h3>
+<ul><li>Actual event bot and signed quantity verified: classify as <strong>Confirmed event</strong>.</li>
+<li>Directional trade burst observed but source uncertain: <strong>Suspected event</strong>, if you have supporting trade-volume evidence.</li>
+<li>Only midpoint changed, with no trustworthy volume or source: choose <strong>Reviewed, no volume evidence</strong> or <strong>Dismiss</strong>.</li>
+<li>Ordinary customer or team prints: <strong>Ordinary public tape</strong>. These do not enter the event-settlement formula.</li></ul></section>
+<section class="manual-section" id="recover"><div class="kicker">RECOVERY</div><h2>If the feed, teammate, or order diverges</h2>
+<table><thead><tr><th>Issue</th><th>Do this</th></tr></thead><tbody>
+<tr><td>Reader shows wrong instrument after rows move</td><td>Stop capture; in extension choose <strong>Follow symbol dynamically</strong>. Use the proper row selector, check bid and ask previews, then start capture again. Legacy numeric indices are not reorder-safe.</td></tr>
+<tr><td>Chrome reader is offline</td><td>Check the <code>node baskets/bridge/server.mjs</code> terminal, session key, extension status and local panel <strong>Connect</strong>. Until fixed, use <strong>All three baskets</strong> manual grid.</td></tr>
+<tr><td>No response from teammate</td><td>Keep the call pending. A queued call means only the local desk requested it; it does not mean the order was submitted.</td></tr>
+<tr><td>Partial fill</td><td>Ask for cumulative executed shares and actual average price; record PARTIAL, then record FILLED only when total is truly complete.</td></tr>
+<tr><td>Signal turns stale</td><td>Recheck current bid/ask and remaining size before entry. A recommendation can disappear before execution.</td></tr>
+<tr><td>Wrong entry</td><td>Use <strong>Undo last local status</strong> or the relevant journal's correction controls. Do not try to “correct” actual exchange trades in the panel.</td></tr>
+<tr><td>Restart from scratch</td><td><strong>Reset entire game</strong> erases the three local Baskets rounds after confirmation; the timer's Reset is different.</td></tr>
+</tbody></table></section>
+<section class="manual-section" id="finish"><div class="kicker">ROUND TRANSITION</div><h2>Five checks before switching round</h2>
+<ul class="checks"><li>Execution desk shows accurate states for every call, including rejects and cancels.</li>
+<li>Recorded filled positions and open working order quantities reconcile with the real exchange.</li>
+<li>Price alerts were classified using actual evidence, not just direction of price movement.</li>
+<li>The previous round's PnL and exposure were reviewed, with no belief that modeled PnL equals organizer settlement.</li>
+<li>Correct next round is selected and the team has reset the communication call sequence.</li></ul></section></main></div><footer class="bottom"><a href="./">Back to live panel</a><a href="../">All games</a><p>The panel never sends orders to the game. Check current quotes, actual fills and official deadlines.</p></footer></div></body></html>
