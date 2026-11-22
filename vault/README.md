@@ -54,6 +54,16 @@ The Baskets field mapper was adapted to a separate Vault extension. Vault's symb
 4. Start capture. In the local Vault panel, paste the key into the bridge connection area and connect. Verify that quote values match the actual exchange.
 5. Optionally map displayed sizes, current positions and working order quantities. Mapping works only for visible DOM numeric values, not canvas-only interfaces, inaccessible iframes or closed shadow roots.
 
+### New: contract-locked extraction when rows or columns move
+
+The Game 2 reader's symbol-following improvements are now available in Game 3. In the Vault Chrome reader, the **Pick** button attempts to bind each chosen numeric field to its containing **VAULT**, **G5**, or **PUB** row, rather than remembering which row or number was first. The lock is re-evaluated on every capture, so the named contract remains correct when order-book rows change order.
+
+To update your existing setup, open **chrome://extensions**, reload **Vault Local Market Reader**, then reopen its popup on the real Vault trading tab. If you already have saved mappings using Element # or Number #, choose **Follow VAULT/G5/PUB dynamically** for each mapped field and set a **Row CSS selector** that identifies the real contract rows, such as `tr` or `.quote-row`. Use **Label or table heading** if field labels are present. If column order also changes, the header method re-detects the appropriate bid/ask column. When neither labels nor headers exist, choose **CSS selector within row** and a stable relative field selector. Click **Check** for every essential bid and ask before starting capture.
+
+When a selected row is absent, duplicated, or identified as the wrong contract, the reader does not import a value. A clicked value under a different contract is rejected by the picker. Ordinary legacy CSS + index selectors remain available for interfaces without readable contract labels, but **they do not follow row reorderings**. Re-pick those fields to gain the new protection.
+
+The reader uses Vault's own symbol names, bid/ask price limits and ticks, `vault:mapping:` storage namespace, `vaultBridgeKey` key storage, and localhost port **8766**. The Baskets reader remains unchanged on port 8765. If a contract's quote is drawn solely on a canvas, a dedicated adapter is required.
+
 The reader sends only explicitly mapped numeric fields to a loopback-only authenticated relay. It does not read arbitrary page content or secrets. No live connection can be tested until the actual competition website is available.
 
 No production deployment was triggered. Automatic Vercel deployments remain disabled.
