@@ -19,6 +19,7 @@ document.getElementById("reset-game").addEventListener("click",()=>{
 let data;try{data=JSON.parse(localStorage.getItem(KEY));}catch{data=null;}
 if(!data||!data.rounds||typeof data.rounds!=='object')data={activeRound:1,rounds:{1:newRound(),2:newRound(),3:newRound()}};
 let round=Number(data.activeRound)||1,state=data.rounds[round]||newRound(),selectedSuit='H',cardMode='add',tab='hand';
+let tradePickSide='receive',tradePickSuit='H';
 const persist=()=>{data.activeRound=round;data.rounds[round]=state;localStorage.setItem(KEY,JSON.stringify(data));};
 function notice(message,error=false){$('status').textContent=message;$('status').style.color=error?'#fb999c':'#75ddca';}
 function pushUndo(label){
@@ -96,6 +97,51 @@ function renderHand(summary){
     <div class="statline"><span>All-trash bonus active</span><strong>${score.allTrash?'YES':'NO'}</strong></div>
     ${score.jokerCard?`<p>The scoring Joker becomes <b>${cardName(score.jokerCard)}</b>. Extra Jokers do not score.</p>`:''}`;
 }
+// One-tap card builder. The existing text fields remain editable for unusual deals.
+function renderTradePicker(){
+  const receiveInput=$('trade-receive').value,giveInput=$('trade-give').value;
+  let parsed={receive:[],give:[]},parseError='';
+  try{parsed={receive:parseCards(receiveInput),give:parseCards(giveInput)};}
+  catch(error){parseError=error.message;}
+  $('trade-picker-side').innerHTML=[['receive','RECEIVE from rival'],['give','GIVE to rival']]
+    .map(([side,label])=>'<button type="button" data-trade-side="'+side+
+      '" aria-pressed="'+(tradePickSide===side)+'" class="'+(tradePickSide===side?'active':'')+
+      '">'+label+'</button>').join('');
+  $('trade-picker-suit').innerHTML=SUITS.map(suit=>
+    '<button type="button" data-trade-suit="'+suit+'" aria-pressed="'+(tradePickSuit===suit)+
+    '" class="'+(tradePickSuit===suit?'active':'')+'">'+SUIT_SYMBOLS[suit]+' '+suit+'</button>').join('');
+  $('trade-picker-ranks').innerHTML=RANKS.map(rank=>{
+    const card={rank,suit:tradePickSuit},code=cardCode(card);
+    const owned=state.cards.filter(c=>cardCode(c)===code).length;
+    const alreadyGiving=parsed.give.filter(c=>cardCode(c)===code).length;
+    const disabled=Boolean(parseError)||(tradePickSide==='give'&&alreadyGiving>=owned);
+    const label=rank===14?'A':rank===13?'K':rank===12?'Q':rank===11?'J':String(rank);
+    return '<button type="button" data-trade-rank="'+rank+'" '+(disabled?'disabled':'')+
+      ' title="'+(tradePickSide==='give'?'Available to give: '+Math.max(0,owned-alreadyGiving):'Add to your received cards')+
+      '">'+label+'</button>';
+  }).join('');
+  const row=(side,title)=>'<div><strong>'+title+'</strong><div class="picker-chips">'+
+    (parsed[side].map((card,i)=>'<button type="button" data-proposal-remove="'+side+':'+i+
+      '" title="Remove '+cardCode(card)+'" aria-label="Remove '+cardCode(card)+' from '+side+'">'+
+      cardName(card)+' ×</button>').join('')||'<span class="muted">None</span>')+
+      '</div></div>';
+  $('trade-picker-summary').innerHTML=parseError?
+    '<p class="muted">Check the manually entered card codes first: '+esc(parseError)+'</p>':
+    row('receive','Receiving')+row('give','Giving');
+}
+function applyPickerCard(card){
+  try{
+    const field=$('trade-'+tradePickSide);
+    const list=parseCards(field.value);
+    if(tradePickSide==='give'){
+      const code=cardCode(card),inHand=state.cards.filter(c=>cardCode(c)===code).length;
+      if(list.filter(c=>cardCode(c)===code).length>=inHand)
+        throw Error('You cannot give more copies than are held.');
+    }
+    field.value=[...list.map(cardCode),cardCode(card)].join(' ');
+    renderTrade();
+  }catch(error){notice(error.message,true);}
+}
 function clearTrade(){
   for(const id of ['trade-receive','trade-give','trade-contract-name'])$(id).value='';
   $('trade-cash').value=0;$('trade-jokers').value=0;$('trade-give-contract').value='';
@@ -111,6 +157,7 @@ function readTrade(){
 }
 let latestTrade=null;
 function renderTrade(){
+  renderTradePicker();
   const selected=$('trade-give-contract').value;
   $('trade-give-contract').innerHTML='<option value="">None</option>'+state.contracts.map(c=>`<option value="${esc(c.id)}">${esc(c.name)} · ${pts(c.payout)} pts</option>`).join('');
   if(state.contracts.some(c=>c.id===selected))$('trade-give-contract').value=selected;
@@ -220,6 +267,32 @@ $('undo').addEventListener('click',()=>{
 });
 $('buy-list').addEventListener('click',e=>{const b=e.target.closest('[data-try-buy]');if(b)tryCard(b.dataset.tryBuy,'buy');});
 $('sell-list').addEventListener('click',e=>{const b=e.target.closest('[data-try-sell]');if(b)tryCard(b.dataset.trySell,'sell');});
+$('trade-picker').addEventListener('click',event=>{
+  const button=event.target.closest('button');if(!button)return;
+  if(button.dataset.tradeSide){
+    tradePickSide=button.dataset.tradeSide;renderTradePicker();return;
+  }
+  if(button.dataset.tradeSuit){
+    tradePickSuit=button.dataset.tradeSuit;renderTradePicker();return;
+  }
+  if(button.dataset.tradeRank){
+    applyPickerCard({rank:Number(button.dataset.tradeRank),suit:tradePickSuit});return;
+  }
+  if(button.dataset.proposalRemove){
+    const [side,indexText]=button.dataset.proposalRemove.split(':');
+    try{
+      const cards=parseCards($('trade-'+side).value),index=Number(indexText);
+      if(!['receive','give'].includes(side)||!Number.isInteger(index)||index<0||index>=cards.length)return;
+      cards.splice(index,1);$('trade-'+side).value=cards.map(cardCode).join(' ');
+      renderTrade();
+    }catch(error){notice(error.message,true);}
+    return;
+  }
+  if(button.dataset.tradeCash!==undefined){
+    $('trade-cash').value=button.dataset.tradeCash;
+    renderTrade();return;
+  }
+});
 // Trade evaluation and contract inventory.
 ['trade-receive','trade-give','trade-cash','trade-jokers','trade-give-contract','trade-contract-name','trade-contract-payout','trade-contract-prob']
   .forEach(id=>$(id).addEventListener('input',renderTrade));
