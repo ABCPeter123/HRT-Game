@@ -44,3 +44,9 @@
 .learning-history span:first-child{color:var(--text);font-weight:720}
 .learning-panel .spaced{margin-top:13px}
 @media(max-width:600px){.learning-history{grid-template-columns:55px minmax(0,1fr) auto;font-size:10px}}
+
+/* Safe global restart distinct from the existing per-round reset. */
+.topbar{flex-wrap:wrap}
+#reset-game{margin-left:auto;border-color:#80515a;color:#f4b5bb}
+#reset-game:hover{background:#3b2530}
+@media(max-width:600px){#reset-game{margin-left:0;width:100%}}
