@@ -285,7 +285,9 @@ function renderQuickGrid() {
     SYMBOLS.map(sym=>
       '<div class="quick-row"><button type="button" data-symbol="'+sym+
       '" class="quick-symbol'+(state.selected===sym?" selected":"")+'">'+sym+'</button>'+
-      QUICK_FIELDS.map(key=>quickEntryCell(sym,key)).join("")+'</div>'
+      QUICK_FIELDS.map(key=>'<label class="quick-cell"><span class="quick-cell-label">'+
+        (key==="position"?"Position":key==="bid"?"Best bid":"Best ask")+
+        '</span>'+quickEntryCell(sym,key)+'</label>').join("")+'</div>'
     ).join("");
 }
 function syncMarketInputs(){
