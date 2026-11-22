@@ -29,7 +29,13 @@ const required=[
   "treasures-and-trash/app.js",
   "treasures-and-trash/engine.js",
   "treasures-and-trash/styles.css",
-  "treasures-and-trash/README.md"
+  "treasures-and-trash/README.md",
+  "vault/index.html",
+  "vault/app.js",
+  "vault/engine.js",
+  "vault/import.js",
+  "vault/styles.css",
+  "vault/README.md"
 ];
 rmSync(output,{recursive:true,force:true});
 for(const relative of required) {
