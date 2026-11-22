@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c111b">
+<meta name="description" content="Baskets live exchange decision panel for WQC Fall 2026. Fair values, event-flow, orders, and opponent counterplay calculated locally.">
+<title>Baskets | Quant Comp 2026</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="shell">
+  <header class="masthead">
+    <div class="brand">
+      <a href="../index.html" class="back">← All games</a>
+      <div class="logo">Q</div>
+      <div><span class="eyebrow">WQC 2026 · GAME 02</span><h1>Baskets</h1></div>
+    </div>
+    <div class="local-status"><i></i> LOCAL DECISION ENGINE <span>NO LIVE FEED</span></div>
+  </header>
+  <section class="toolbar">
+    <div class="round-switch"><div class="overline">ROUND</div><div id="roundButtons" class="round-buttons"></div></div>
+    <div class="timer"><div><span>REMAINING</span><strong id="timerValue">10:00</strong></div><button id="timerButton" class="button small">Start</button><button id="timerReset" class="button small ghost">Reset</button></div>
+  </section>
+  <section class="indexstrip panel" aria-labelledby="indexTitle">
+    <div class="sectionheading"><div><span class="eyebrow">MODELLED SETTLEMENT</span><h2 id="indexTitle">Index values</h2></div><span class="muted" id="flowConfidenceTag">UNCERTAIN FLOW</span></div>
+    <div id="indexValues" class="indices"></div>
+    <div class="indexFoot" id="indexFoot">Settlement starts from three indices of $200.</div>
+  </section>
+  <main class="main-grid">
+    <div class="left-col">
+      <section class="panel" aria-labelledby="booksTitle">
+        <div class="sectionheading"><div><span class="eyebrow">MARKET MONITOR</span><h2 id="booksTitle">Select a basket</h2></div><span class="smalltag">3 ORDERBOOKS</span></div>
+        <div id="symbolButtons" class="market-tabs" role="group" aria-label="Choose basket"></div>
+        <div class="selected-header"><div><span class="eyebrow" id="symbolSubtitle">TEK + NRG</span><h2 id="symbolName">GRID</h2></div><strong id="symbolFair" class="fair-price">$400.00</strong></div>
+        <div class="input-grid">
+          <label class="field"><span>Best bid <button type="button" data-help="bid" aria-label="Help for best bid" class="help">?</button></span><input id="bid" data-book="bid" type="number" inputmode="decimal" step=".5" min="0" max="800" placeholder="399.50"></label>
+          <label class="field"><span>Best ask <button type="button" data-help="ask" aria-label="Help for best ask" class="help">?</button></span><input id="ask" data-book="ask" type="number" inputmode="decimal" step=".5" min="0" max="800" placeholder="400.50"></label>
+          <label class="field"><span>Displayed bid size <button type="button" data-help="bidSize" aria-label="Help for bid size" class="help">?</button></span><input id="bidSize" data-book="bidSize" type="number" inputmode="numeric" min="0" step="1" placeholder="Optional"></label>
+          <label class="field"><span>Displayed ask size <button type="button" data-help="askSize" aria-label="Help for ask size" class="help">?</button></span><input id="askSize" data-book="askSize" type="number" inputmode="numeric" min="0" step="1" placeholder="Optional"></label>
+          <label class="field"><span>Your position <button type="button" data-help="position" aria-label="Help for position" class="help">?</button></span><input id="position" data-book="position" type="number" inputmode="numeric" min="-1000" max="1000" step="1" value="0"></label>
+          <div class="field capacity-preview"><span>Worst-case room <button type="button" data-help="capacity" aria-label="Help for remaining capacity" class="help">?</button></span><div id="capacityPreview">BUY 1000 · SELL 1000</div></div>
+          <label class="field"><span>Working buy shares <button type="button" data-help="openBuys" aria-label="Help for open buy shares" class="help">?</button></span><input id="openBuys" data-book="openBuys" type="number" inputmode="numeric" step="1" min="0" placeholder="0"></label>
+          <label class="field"><span>Working sell shares <button type="button" data-help="openSells" aria-label="Help for open sell shares" class="help">?</button></span><input id="openSells" data-book="openSells" type="number" inputmode="numeric" step="1" min="0" placeholder="0"></label>
+        </div>
+        <div class="inline-row">
+          <button class="button quiet" id="captureBook">Record market snapshot</button><span id="bookValidation" class="text-muted"></span>
+        </div>
+        <details class="guide" id="bookGuide">
+          <summary>Orderbook input guide</summary>
+          <div id="bookGuideText" class="guide-body"></div>
+        </details>
+      </section>
+      <section class="panel" aria-labelledby="flowTitle">
+        <div class="sectionheading"><div><span class="eyebrow">EVENT SIGNALS</span><h2 id="flowTitle">Log directional volume</h2></div><button id="undoFlow" class="button ghost small">Undo</button></div>
+        <div class="flow-modes" id="flowModes" role="group" aria-label="Choose order flow type"></div>
+        <div class="flow-totals" id="flowTotals"></div>
+        <div class="quickflow">
+          <div class="quickflow-label">Seller initiated / event sells</div>
+          <div class="quickflow-buttons" id="flowNegative"></div>
+          <div class="quickflow-label">Buyer initiated / event buys</div>
+          <div class="quickflow-buttons" id="flowPositive"></div>
+        </div>
+        <div class="smallfield"><label for="customFlow">Custom signed volume</label><div class="inline-row"><input id="customFlow" type="number" inputmode="numeric" step="1" placeholder="e.g. -125"><button id="addCustomFlow" class="button secondary">Add</button></div></div>
+        <div class="flow-explanation" id="flowExplanation"></div>
+        <details class="guide"><summary>Flow classifications and input guide</summary>
+          <div class="guide-body">
+            <p><strong>Confirmed event:</strong> Add signed volume only if you can reliably identify the event bot. This volume changes the theoretical settlement directly.</p>
+            <p><strong>Suspected event:</strong> Use for a directional burst that may be event-bot flow. It contributes only after the confidence discount in Strategy settings.</p>
+            <p><strong>Public tape:</strong> Use for buy- or sell-initiated trades that could come from customers, makers or other teams. It informs rival behavior only. It never moves modeled settlement.</p>
+            <p>Positive values mean buys, negative values mean sells. All buttons add volume for the selected basket. Undo reverses your latest entry. Do not add the same trade to more than one flow category.</p>
+          </div>
+        </details>
+      </section>
+      <section class="panel" aria-labelledby="fillsTitle">
+        <div class="sectionheading"><div><span class="eyebrow">EXECUTION JOURNAL</span><h2 id="fillsTitle">Record actual fills</h2></div><span class="smalltag" id="fillsCount">0 FILLS</span></div>
+        <div class="fill-row">
+          <div class="fill-toggle" id="fillSideButtons"><button data-fill-side="BUY" class="selected">BUY</button><button data-fill-side="SELL">SELL</button></div>
+          <label class="field"><span>Filled shares</span><input id="fillQty" type="number" min="1" step="1" inputmode="numeric" value="20"></label>
+          <label class="field"><span>Actual fill price</span><input id="fillPrice" type="number" min="0" max="800" step=".5" inputmode="decimal" placeholder="400.0"></label>
+        </div>
+        <div class="inline-row"><button class="button secondary" id="recordFill">Record filled trade</button><span class="text-muted">Only after the exchange confirms a fill.</span></div>
+        <div id="fillSummary" class="fill-summary"></div>
+        <details class="guide"><summary>Inventory and PnL guide</summary>
+          <div class="guide-body">
+            <p><strong>Position</strong> is your signed filled inventory. Positive is long and negative is short. This panel increases or decreases position when you log a real fill.</p>
+            <p><strong>Working buy/sell shares</strong> are outstanding orders that could still fill. Enter total shares per side, including multiple orders. Edit them after fills or cancellations.</p>
+            <p><strong>Filled shares and price</strong> record executed trades, not submitted but unfilled orders. If you manually overwrite position, this panel cannot reconstruct historical cash PnL and hides that estimate.</p>
+          </div>
+        </details>
+      </section>
+    </div>
+    <aside class="right-col">
+      <section class="decision-panel" aria-labelledby="decisionTitle">
+        <div class="decision-header"><span class="eyebrow" id="decisionTitle">BEST ACTION RIGHT NOW</span><span id="decisionConfidence" class="state-chip">WAITING FOR BOOKS</span></div>
+        <div id="actionTitle" class="big-action">HOLD</div>
+        <div id="actionSubtitle" class="action-subtitle">Enter best bid and ask to find an opportunity.</div>
+        <div class="action-quote" id="actionQuote"></div>
+        <div id="actionMetrics" class="action-metrics"></div>
+        <div class="button-pair"><button id="useAction" class="button primary">Copy into fill draft</button><button id="copyAction" class="button secondary">Copy order</button></div>
+        <p class="fineprint" id="actionReason">This panel never places orders. Trade recommendations use a conservative, uncalibrated liquidity and risk model.</p>
+      </section>
+      <section class="panel" aria-labelledby="opponentsTitle">
+        <div class="sectionheading"><div><span class="eyebrow">OPPONENT COUNTERPLAY</span><h2 id="opponentsTitle">Market conditions</h2></div><span class="smalltag">HEURISTIC</span></div>
+        <div id="opponentProfiles"></div>
+        <div id="counterInsight" class="counter-note"></div>
+        <div class="hint">The packet does not reveal individual player strategies. These are scenarios inferred from entered quotes, public prints, and saved snapshots.</div>
+      </section>
+      <section class="panel" aria-labelledby="settingsTitle">
+        <div class="sectionheading"><div><span class="eyebrow">STRATEGY SETTINGS</span><h2 id="settingsTitle">Risk and speed</h2></div></div>
+        <label class="slider-row" for="trustSlider"><span>Suspected-event confidence <button type="button" data-help="trust" class="help">?</button></span><strong id="trustLabel">35%</strong></label>
+        <input id="trustSlider" data-setting="trust" type="range" min="0" max="100" step="5" value="35">
+        <div class="hint">0% ignores suspected events. 100% treats suspected flow as entirely event-bot volume. Default 35% is an assumption, not a calibrated estimate.</div>
+        <label class="slider-row spaced" for="riskSlider"><span>Downside sensitivity <button type="button" data-help="risk" class="help">?</button></span><strong id="riskLabel">35%</strong></label>
+        <input id="riskSlider" data-setting="risk" type="range" min="0" max="100" step="5" value="35">
+        <div class="hint">Higher values penalize uncertain settlement and adding to concentrated inventory. This does not impose a maximum-loss cap.</div>
+        <label class="slider-row spaced" for="maxOrder"><span>Order size cap <button type="button" data-help="maxOrder" class="help">?</button></span></label>
+        <div id="sizePresets" class="preset-row"></div>
+        <input id="maxOrder" data-setting="maxOrder" type="number" min="1" max="1000" step="1" inputmode="numeric" value="100">
+        <div class="hint">A voluntary cap per suggested order. Exchange maximum is still ±1000 per basket, including possible fills from open orders.</div>
+      </section>
+      <section class="panel" aria-labelledby="summaryTitle">
+        <div class="sectionheading"><div><span class="eyebrow">WHOLE PORTFOLIO</span><h2 id="summaryTitle">Inventory & alternatives</h2></div></div>
+        <div id="portfolioSummary"></div>
+        <div id="alternatives"></div>
+      </section>
+    </aside>
+  </main>
+  <footer>WQC GAME 02 <span>·</span> Manual inputs, local decisions. No exchange API, no Vercel redeployments needed.</footer>
+</div>
+<div id="toast" class="toast" role="status"></div>
+<script type="module" src="./app.js"></script>
+</body>
+</html>

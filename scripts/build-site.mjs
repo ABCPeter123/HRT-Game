@@ -11,7 +11,12 @@ const required=[
   "scavenger/app.js",
   "scavenger/engine.js",
   "scavenger/styles.css",
-  "scavenger/README.md"
+  "scavenger/README.md",
+  "baskets/index.html",
+  "baskets/app.js",
+  "baskets/engine.js",
+  "baskets/styles.css",
+  "baskets/README.md"
 ];
 rmSync(output,{recursive:true,force:true});
 for(const relative of required) {

@@ -1,0 +1,37 @@
+name: Baskets strategy panel
+
+on:
+  pull_request:
+    paths:
+      - 'baskets/**'
+      - 'scripts/build-site.mjs'
+      - '.github/workflows/baskets-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'baskets/**'
+      - 'scripts/build-site.mjs'
+      - '.github/workflows/baskets-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: baskets
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check engine.js
+      - run: node --check app.js
+      - run: npm test
+      - run: node ../scripts/build-site.mjs
+      - run: test -f ../dist/baskets/index.html && test -f ../dist/baskets/engine.js
