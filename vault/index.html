@@ -124,6 +124,7 @@
           <label>Fill price<input id="fill-price" type="number" min="0" step=".1" inputmode="decimal"></label>
         </div>
         <label class="checkbox-row"><input id="fill-resting" type="checkbox"> My resting maker quote was filled (rebate + 5¢ / share)</label>
+        <label class="field-note">Outstanding size of that resting order before the fill (for the 5-second penalty waiver)<input id="fill-original-size" type="number" min="0" step="1" inputmode="numeric" placeholder="e.g. 20, only if own resting fill"></label>
         <div class="inline"><button id="record-fill" class="primary" type="button">Record filled order</button><button id="undo-fill" class="ghost" type="button">Undo latest fill</button></div>
         <div class="hint" id="fill-status" role="status"></div>
       </section>
