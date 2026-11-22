@@ -353,15 +353,21 @@ function recordFill(){
  const symbol=$("fill-symbol").value,side=$("fill-side").value;
  const qty=Number($("fill-qty").value),price=Number($("fill-price").value);
  const quoted=$("fill-resting").checked;
+ const rawOriginal=$("fill-original-size").value.trim();
+ const originalSize=rawOriginal===""?null:Number(rawOriginal);
+ if(quoted&&rawOriginal!==""&&(!Number.isSafeInteger(originalSize)||originalSize<0||originalSize<qty)){
+   message("fill-status","Enter the resting order size before the fill (at least the filled shares).",true);return;
+ }
  if(quoted&&currentRole()!=="maker"){message("fill-status","Taker fills cannot earn maker rebates.",true);return;}
  const before={...r().books[symbol]},last=r().lastQuoteFillAt;
  try{
    const next=applyFill(before,currentRole(),{symbol,side,quantity:qty,price,quoted});
    r().books[symbol]=next;
-   if(quoted&&qty>10)r().lastQuoteFillAt=r().elapsed;
-   r().fills.push({symbol,side,qty,price,quoted,before,lastQuoteFillAt:last});
+   if(quoted&&originalSize!==null&&originalSize>10)r().lastQuoteFillAt=r().elapsed;
+   r().fills.push({symbol,side,qty,price,quoted,originalSize,before,lastQuoteFillAt:last});
    store();marketInputs();renderDecision();renderRisk();
-   message("fill-status","Confirmed fill recorded. Working orders may need updating.");
+   message("fill-status","Confirmed fill recorded. Working orders may need updating."+
+     (quoted&&originalSize===null?" Enter the original resting order size next time to model 5-second penalty grace.":""));
  }catch(e){message("fill-status",e.message,true);}
 }
 function undoFill(){
@@ -375,6 +381,7 @@ function setCohort(value){
  pauseTimer();
  state.cohort=value;
  for(let i=0;i<4;i++)state.rounds[i].role=roleForRound(value,i+1);
+ if(currentRole()==="maker"&&state.selected>20)state.selected=1;
  renderAll();
 }
 function renderAll(){
