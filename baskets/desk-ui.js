@@ -4,7 +4,7 @@
  * Repricing observations are hypotheses until a human classifies them.
  */
 import {SYMBOLS,validateBook,finite} from "./engine.js";
-import {emptyDesk,createCall,teammateCallText,parseTeammateStatus,updateCall,
+import {emptyDesk,createCall,teammateCallText,parseTeammateStatus,composeQuickReply,updateCall,
   observeRepricing,addPriceAlert,classifyPriceAlert,pendingAlerts,
   accountingSnapshot,undoReportedStatus} from "./desk-engine.js";
 
@@ -17,6 +17,7 @@ const active=c=>!["FILLED","CANCELLED","REJECTED"].includes(c.status);
 const timeString=t=>new Date(t).toLocaleTimeString("en-CA",{hour:"2-digit",minute:"2-digit",second:"2-digit"});
 export function createDeskUI({getState,getRound,getDecision,getCapture,save,refresh,onFlow,toast}) {
   let watches={},selectedAlertId=null,selectedSide=0,prompted=new Set(),lastQuoteRound=-1;
+  let quickCallId=null,quickStatus="WORKING",quickQty="",quickPrice="";
   const currentDesk=()=>getRound().desk;
   function resetWatch(){
     watches={};selectedAlertId=null;selectedSide=0;prompted=new Set();
@@ -122,6 +123,91 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
       '<button type="button" class="button secondary" data-call-status="FILLED" data-call-id="'+escape(call.id)+'">Fully filled</button>'+
       '</div>':"")+'</article>';
   }
+  const QUICK_STATUSES=[
+    ["ACK","Acknowledged"],["WORKING","Order working"],
+    ["PARTIAL","Partially filled"],["FILLED","Fully filled"],
+    ["CANCELLED","Cancelled"],["REJECTED","Rejected"]
+  ];
+  function quickOrder(){
+    return (currentDesk().calls||[]).find(c=>c.id===quickCallId&&active(c))||null;
+  }
+  function quickReport(){
+    return composeQuickReply(quickOrder(),{
+      status:quickStatus,qty:quickQty===""?null:Number(quickQty),
+      price:quickPrice===""?null:Number(quickPrice)
+    });
+  }
+  function previewQuick(){
+    const order=quickOrder();
+    const preview=$("quickPreview"),error=$("quickError");
+    if(!order){
+      preview.textContent="Queue an order above to begin.";
+      error.textContent="";$("quickApply").disabled=true;$("quickCopy").disabled=true;
+      return;
+    }
+    try{
+      const result=quickReport();
+      preview.textContent=result.text;
+      error.textContent="";
+      $("quickApply").disabled=false;$("quickCopy").disabled=false;
+    }catch(err){
+      preview.textContent=order.id+" "+quickStatus+
+        (["PARTIAL","FILLED"].includes(quickStatus)?" [shares] @ [actual average price]":"");
+      error.textContent=err.message;
+      $("quickApply").disabled=true;$("quickCopy").disabled=true;
+    }
+  }
+  function renderQuickBuilder(){
+    const open=(currentDesk().calls||[]).filter(active).slice().reverse();
+    const selector=$("quickCallId");
+    if(!open.some(c=>c.id===quickCallId)){
+      quickCallId=open[0]?.id||null;
+      quickStatus=quickOrder()?.filledQty?"PARTIAL":"WORKING";
+      quickQty="";quickPrice="";
+    }
+    const order=quickOrder();
+    selector.innerHTML=open.length?
+      open.map(c=>'<option value="'+escape(c.id)+'">'+
+        escape(c.id+" · "+c.side+" "+c.qty+" "+c.symbol+" · "+c.status)+
+        '</option>').join(""):
+      '<option value="">No active orders</option>';
+    selector.value=order?.id||"";
+    selector.disabled=!order;
+    const filled=order?.filledQty||0;
+    const allowed=status=>order&&
+      !(status==="ACK"&&!["CALLED","ACK"].includes(order.status))&&
+      !(status==="WORKING"&&filled>0)&&
+      !(status==="REJECTED"&&filled>0)&&
+      !(status==="PARTIAL"&&filled>=order.qty-1);
+    $("quickStatusButtons").innerHTML=QUICK_STATUSES.map(([status,label])=>
+      '<button type="button" data-quick-status="'+status+'" class="quick-status-button '+
+      (quickStatus===status?"selected":"")+'" aria-pressed="'+(quickStatus===status)+
+      '" '+(!allowed(status)?"disabled":"")+'>'+label+'</button>').join("");
+    if(!allowed(quickStatus))quickStatus=filled>0?"PARTIAL":"WORKING";
+    // Refresh the selected highlight if switching to a valid fallback.
+    $("quickStatusButtons").querySelectorAll("button").forEach(b=>{
+      const selected=b.dataset.quickStatus===quickStatus;
+      b.classList.toggle("selected",selected);
+      b.setAttribute("aria-pressed",String(selected));
+    });
+    const isFill=["PARTIAL","FILLED"].includes(quickStatus);
+    $("quickFillFields").hidden=!isFill;
+    if(isFill&&order){
+      if(quickStatus==="FILLED")quickQty=String(order.qty);
+      $("quickQty").value=quickQty;
+      $("quickQty").min=String(filled);
+      $("quickQty").max=String(order.qty);
+      $("quickQty").readOnly=quickStatus==="FILLED";
+      $("quickPrice").value=quickPrice;
+      $("quickQtyButtons").innerHTML=[["25%","25"],["50%","50"],["75%","75"],["All","100"],
+        ["−1","minus"],["+1","plus"]].map(([label,val])=>
+        '<button type="button" class="button small ghost" data-quick-qty="'+val+
+        '" '+(quickStatus==="FILLED"?"disabled":"")+'>'+label+'</button>').join("");
+    }
+    $("quickUseLimit").textContent=order?
+      "Use "+money(order.price)+" limit as verified fill price":"Use order limit as actual fill price";
+    previewQuick();
+  }
   function renderCalls(){
     const rows=(currentDesk().calls||[]).slice().reverse();
     rows.sort((a,b)=>Number(active(b))-Number(active(a))||b.createdAt-a.createdAt);
@@ -129,6 +215,7 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
       '<div class="desk-call-list">'+rows.slice(0,20).map(renderCallCard).join("")+'</div>':
       '<div class="desk-call-empty">No calls yet. Once a live recommendation is available, copy it to your teammate and track the response here.</div>';
     $("undoTeammateStatus").disabled=!(currentDesk().audit||[]).length;
+    renderQuickBuilder();
     counters();
   }
   async function copyToClipboard(message){
@@ -382,6 +469,44 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
     if(button.id==="openAnalysis")return tab("analysis");
     if(button.id==="enableDesktopAlerts")return enableDesktopNotifications();
     if(button.id==="undoTeammateStatus")return undoLastReport();
+    if(button.dataset.quickStatus){
+      quickStatus=button.dataset.quickStatus;
+      if(quickStatus==="FILLED"&&quickOrder())quickQty=String(quickOrder().qty);
+      if(quickStatus==="PARTIAL"&&quickOrder()&&Number(quickQty)>=quickOrder().qty)quickQty="";
+      renderQuickBuilder();return;
+    }
+    if(button.dataset.quickQty){
+      const order=quickOrder();if(!order)return;
+      const current=Number(quickQty)||order.filledQty||0;
+      const value=button.dataset.quickQty;
+      const proposed=value==="plus"?current+1:value==="minus"?current-1:
+        Math.ceil(order.qty*Number(value)/100);
+      const safe=Math.max(order.filledQty+1,Math.min(order.qty-1,proposed));
+      if(safe>order.filledQty&&safe<order.qty)quickQty=String(safe);
+      else toast("Choose a partial quantity between previous filled shares and the total.");
+      renderQuickBuilder();return;
+    }
+    if(button.id==="quickUseLimit"){
+      const order=quickOrder();if(!order)return;
+      quickPrice=String(order.price);$("quickPrice").value=quickPrice;
+      previewQuick();return;
+    }
+    if(button.dataset.priceAdjust){
+      if(quickPrice===""){toast("Select a fill price first.");return;}
+      const value=Number(quickPrice)+Number(button.dataset.priceAdjust);
+      if(value<0||value>800){toast("Price must be between $0 and $800.");return;}
+      quickPrice=String(Math.round(value*100)/100);$("quickPrice").value=quickPrice;
+      previewQuick();return;
+    }
+    if(button.id==="quickApply"||button.id==="quickCopy"){
+      try{
+        const result=quickReport();
+        if(button.id==="quickCopy")await copyToClipboard(result.text);
+        else safeReport(result.update.id,result.update);
+      }catch(err){toast(err.message);}
+      return;
+    }
+
     if(button.id==="callTeammate")return callTeammate();
     if(button.dataset.copyCall){
       const call=currentDesk().calls.find(c=>c.id===button.dataset.copyCall);
@@ -422,7 +547,15 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
     }
     if(button.dataset.classifyAlert)return classify(button.dataset.classifyAlert);
   });
+  document.addEventListener("input",event=>{
+    if(event.target.id==="quickQty"){quickQty=event.target.value;previewQuick();}
+    if(event.target.id==="quickPrice"){quickPrice=event.target.value;previewQuick();}
+  });
   document.addEventListener("change",event=>{
+    if(event.target.id==="quickCallId"){
+      quickCallId=event.target.value;quickStatus=quickOrder()?.filledQty?"PARTIAL":"WORKING";
+      quickQty="";quickPrice="";renderQuickBuilder();return;
+    }
     if(event.target.id==="alertTicks"){
       getState().alertTicks=[2,3,4,6].includes(Number(event.target.value))?
         Number(event.target.value):3;
