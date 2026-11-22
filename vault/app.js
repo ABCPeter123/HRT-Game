@@ -49,7 +49,8 @@ function setStage(value){
   store();
 }
 function model(){
-  try{latest=chipPosterior(r().chips);return latest;}
+  try{const chips=currentRole()==="maker"?r().chips.map((c,i)=>i>=20?freshChip(i+1):c):r().chips;
+    latest=chipPosterior(chips);return latest;}
   catch(e){message("model-warning","Chip validation error: "+e.message,true);return null;}
 }
 function renderHead(){
