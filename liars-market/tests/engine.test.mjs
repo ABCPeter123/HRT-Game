@@ -29,7 +29,7 @@ test("jokers are wild, no regular flush and ace-low straights are 5-high",()=>{
   assert.deepEqual(highestClaim([...fourSevens,52,53]),{type:"six",a:7});
   const hearts2345=[id(2,2),id(3,2),id(4,2),id(5,2),52];
   assert.equal(hasClaim(hearts2345,{type:"sf",a:5}),true);
-  assert.equal(hasClaim(hearts2345,{type:"sf",a:6}),false);
+  assert.equal(hasClaim(hearts2345,{type:"sf",a:7}),false);
   assert.equal(hasClaim([id(9,0),id(10,0),id(11,0),id(12,0),id(13,0)],{type:"sf",a:13}),true);
   assert.equal(highestClaim([id(2,0),id(3,0),id(4,0),id(8,0),id(9,0)]).type,"high");
 });
