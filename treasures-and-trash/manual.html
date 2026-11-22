@@ -1,0 +1,74 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0d1320"><meta name="description" content="Treasures and Trash user manual for hand valuation, teammate negotiation, auction slips and cash control."><title>Treasures &amp; Trash user manual | Quant Comp 2026</title><link rel="stylesheet" href="../manual.css"></head><body><div class="shell"><header class="sitebar"><a href="./">← Back to Treasures &amp; Trash panel</a><small>QUANT COMP 2026 / GAME 04 / OPERATING MANUAL</small></header><div class="hero"><div class="eyebrow">LIVE OPERATIONS GUIDE</div><h1>Treasures &amp; Trash user manual</h1><p class="lead">Run one authoritative hand ledger while your teammates negotiate, submit sealed auction bids, and complete physical trades.</p><div class="manual-meta"><span>3-person team (sometimes 2)</span><span>3 rounds · 2m discussion + 15m trading</span><span>Cards · cash · Jokers · contracts</span></div><div class="hero-actions"><a class="button primary" href="./">Open game panel</a><a class="button" href="./README.md">Rules and scoring reference</a><a class="button" href="#" onclick="window.print();return false;">Print guide</a></div></div><div class="layout"><nav class="toc" aria-label="Manual sections"><strong>IN THIS GUIDE</strong><a href="#quick">60-second overview</a><a href="#setup">Before you start</a><a href="#roles">Teammate responsibilities</a><a href="#steps">Exact operating steps</a><a href="#calls">Negotiation and auction calls</a><a href="#recover">Errors and recovery</a><a href="#finish">End-of-round checklist</a></nav><main><section class="manual-section" id="quick"><div class="kicker">AT A GLANCE</div><h2>One team, three desks</h2>
+<p>The trading round has four panel stages: <strong>1. Hand &amp; prices → 2. Trade calculator → 3. Auctions → 4. Opponents</strong>. Cards, cash and contracts are shared team resources. The panel evaluates marginal score changes but cannot negotiate or deliver assets on its own.</p>
+<div class="note caution"><strong>Privacy rule:</strong> the competition prohibits showing your private cards to other teams. Keep the Hand screen visible only to your officially assigned teammates. Other teams may ask to see your cash, Jokers and contracts, which are public assets.</div>
+<p>Each of three rounds has a <strong>two-minute discussion</strong> period followed by a <strong>15-minute trading</strong> period. Your team starts each round with nine cards, $500 and 15 auction slips. The competition has 40 teams.</p></section>
+<section class="manual-section" id="setup"><div class="kicker">BEFORE THE FIRST TRADE</div><h2>Prepare your hand, cash and suit</h2>
+<ol class="steps">
+<li><strong>Open the local panel.</strong> Run <code>python -m http.server 8000</code> in the repository root and open <code>http://localhost:8000/treasures-and-trash/</code>. Keep it on a team-only device, away from rival view. Use the official organizer's announcements for timing.</li>
+<li><strong>Select the correct round and treasure suit.</strong> In the header choose <strong>Round 1</strong> and the announced <strong>Treasure suit</strong> (Hearts, Diamonds, Spades or Clubs). The suit of the same color is <em>trash</em>; the two opposite-color suits are <em>neutral</em>.</li>
+<li><strong>Record your initial hand.</strong> Open <strong>1. Hand &amp; prices</strong>. Use <strong>+ Add cards</strong> to tap each suit and rank, or expand <strong>Faster: paste your full hand at once</strong>. Use <strong>Replace hand</strong> after verifying all nine cards, or <strong>Add these cards</strong> to augment the hand. Example format: <code>AH 10S 3D 4C 4H 2xKC</code>.</li>
+<li><strong>Confirm cash and special assets.</strong> Check <strong>Cash, $</strong> starts at 500 and <strong>Owned Jokers</strong> matches reality, normally zero. If you already hold any bounty contracts, use <strong>Current contracts → Add a contract you already own</strong>, supply its name, payout and estimated completion chance.</li>
+<li><strong>Decide who physically holds what.</strong> One teammate keeps the card hand and confirms exchanges, another negotiates offers, and another tracks cash, auction slips and the on-screen calculator. If only two team members are present, the negotiator also handles auctions while the calculator operator remains with the hand.</li>
+</ol></section>
+<section class="manual-section" id="roles"><div class="kicker">TEAM OF THREE</div><h2>Keep transactions and bookkeeping separate</h2>
+<div class="twocol">
+<div class="role"><div class="tag">PLAYER A · HAND / CALCULATOR</div><h3>Protect and value holdings</h3><p>Own the panel and physical card list. Check <strong>Top cards to buy</strong>, <strong>Cards you can sell</strong>, and the <strong>Trade calculator</strong>. No trade is committed until Player A checks the actual cards received/given and score difference.</p></div>
+<div class="role"><div class="tag">PLAYER B · NEGOTIATOR</div><h3>Find and negotiate offers</h3><p>Speak with other teams. Ask what card or asset they will exchange and at what price. Relay exact proposals without displaying your private hand. Get Player A's approval before promising a trade. After acceptance, deliver/receive exactly the agreed assets.</p></div>
+<div class="role"><div class="tag">PLAYER C · AUCTIONS / CASH</div><h3>Watch the booths and budget</h3><p>Track auction numbers and closes, carry auction slips, estimate Joker/bounty bid value, and monitor cash reserved for won but unpaid lots. Pay obligations before deadlines and report actual cash spent and assets obtained.</p></div>
+<div class="role"><div class="tag">TWO-PLAYER FALLBACK</div><h3>One ledger, one field operator</h3><p>Player A maintains the panel, current hand, cash and approvals. Player B negotiates and takes auction slips to booths. Before a commitment, read back all terms to Player A.</p></div></div>
+<p><strong>Simple rule:</strong> the teammate controlling the ledger must confirm <em>every</em> physical exchange and auction payment. Otherwise the engine may recommend selling a card that is no longer held or spending cash already owed.</p></section>
+<section class="manual-section" id="steps"><div class="kicker">EACH ROUND</div><h2>Exact panel workflow</h2>
+<ol class="steps">
+<li><strong>Stage 1: value the current hand.</strong> Open <strong>1. Hand &amp; prices</strong>, check all suit/rank entries and cash. <strong>Price the next card</strong> displays the exact marginal point gain of adding a card to your current hand, not the price a rival will accept. <strong>Top cards to buy</strong> shows modeled break-even purchase prices, and <strong>Cards you can sell</strong> shows minimum break-even prices. Click <strong>Try</strong> on a card to load it into the trade editor.</li>
+<li><strong>Stage 2: evaluate a full proposal.</strong> In <strong>2. Trade calculator</strong>, enter every <strong>Card you RECEIVE</strong> and <strong>Card you GIVE</strong>. Use signed <strong>Cash change ($)</strong>, where positive is cash you receive and negative is cash you pay. Set <strong>Jokers change</strong> positive when receiving and negative when giving. Under <strong>Include contracts in this trade</strong>, specify any bounty given or received and its payout/chance. Read the projected exact score change, including same-rank bonuses and all-trash effects.</li>
+<li><strong>Execute only a real agreement.</strong> Player B reads the complete proposal aloud. Player A checks hand inventory, remaining cash and calculated delta. Then Player B physically completes the negotiated exchange. Only <strong>after both sides exchanged the agreed assets</strong>, click <strong>Record this trade after agreement</strong>. Use <strong>Clear proposal</strong> if the deal was rejected.</li>
+<li><strong>Stage 3: price auctions.</strong> Open <strong>3. Auctions</strong>, select <strong>Auction number 1–5</strong> and <strong>Joker</strong> or <strong>Bounty contract</strong>. For a bounty, enter the printed title/condition, payout and your estimated success probability. Check <strong>Downside sensitivity</strong>, the proposed entry bid, and the maximum economically defensible bid. Enter the real sealed bid on a slip at the booth, not in the panel.</li>
+<li><strong>After auction outcome, separate observation from ownership.</strong> If you learn an actual historical winning cutoff, enter <strong>Observed 3rd-place winning bid ($)</strong> and click <strong>Save observed cutoff</strong>. This is only evidence. If you actually won, enter <strong>Actual winning bid you paid ($)</strong>, settle the payment with the booth, then click <strong>Record won item and cash paid</strong>. This changes cash and owned items. Do not use it for a mere observation.</li>
+<li><strong>Stage 4: learn from rival offers.</strong> Open <strong>4. Opponents</strong>. Enter <strong>Other team / identifier</strong>, choose whether they want to <strong>BUY this asset from you</strong> or <strong>SELL this asset to you</strong>, then enter card/asset and offered price. Record outcome <strong>Offer only</strong>, <strong>Accepted</strong> or <strong>Rejected</strong>, and click <strong>Record observation</strong>. The <strong>Opponent counterplay</strong> section can reprioritize currently open offers; confirm the rival still honors the offer before acting.</li>
+<li><strong>Return to Stage 1 after every trade.</strong> Confirm physical cards, remaining cash, Jokers and contracts match the panel. Re-evaluate the best card targets and send Player B a new short list. If the physical trade did not happen, never record it as completed.</li>
+<li><strong>End the trading phase.</strong> When the official 15-minute trading window closes, stop proposing trades. Reconcile assets and submit them to the executive for scoring. Choose the next round and new treasure suit only after the organizer announces them.</li>
+</ol></section>
+<section class="manual-section" id="calls"><div class="kicker">TEAM COMMUNICATION</div><h2>Offer approval and auction payment</h2>
+<h3>Propose → evaluate → accept → record</h3>
+<pre><code>NEGOTIATOR → CALCULATOR
+"Team 17 offers AH for $55. Offer still open."
+"Team 8 wants our 4C, will pay $25."
+
+CALCULATOR → NEGOTIATOR
+"AH at $55 gives +70 net projected points.
+We can afford it. APPROVED."
+or "REJECT. Our break-even maximum is $42."
+
+NEGOTIATOR → CALCULATOR
+"Confirmed: AH received, $55 paid.
+Update holdings now."
+
+AUCTION → CALCULATOR
+"Auction 2, Joker. We bid $74.
+Won and paid $74. Record one Joker."</code></pre>
+<p>These are fictitious illustration values, not official prices. Use the panel's <strong>Trade calculator</strong> before saying “agreed.” If a trade includes multiple cards, Joker or contract changes, quote the full bundle so no component is omitted.</p>
+<h3>Auction schedule and cash discipline</h3>
+<table><thead><tr><th>Auction</th><th>Opens</th><th>Closes</th></tr></thead><tbody>
+<tr><td>1</td><td>0:00</td><td>2:40</td></tr>
+<tr><td>2</td><td>3:00</td><td>5:40</td></tr>
+<tr><td>3</td><td>6:00</td><td>8:40</td></tr>
+<tr><td>4</td><td>9:00</td><td>11:40</td></tr>
+<tr><td>5</td><td>12:00</td><td>14:40</td></tr>
+</tbody></table>
+<div class="note caution"><strong>Winning creates an obligation.</strong> Top three bids, including teams tied at the winning ranks, win and owe their own sealed bid. Pay by the end of the next auction or face disqualification. For auction five, the rules permit after-trading payment at the booth. Reserve cash for outstanding obligations before negotiating new deals.</div></section>
+<section class="manual-section" id="recover"><div class="kicker">COMMON MISTAKES</div><h2>Corrections without duplicate assets</h2>
+<table><thead><tr><th>Problem</th><th>Correct response</th></tr></thead><tbody>
+<tr><td>Physical hand and panel differ</td><td>Use <strong>+ Add cards</strong>, <strong>− Remove cards</strong>, or a verified <strong>Replace hand</strong>. Recount all cards before another trade.</td></tr>
+<tr><td>Trade proposal changed or was refused</td><td>Use <strong>Clear proposal</strong>. Do not click <strong>Record this trade after agreement</strong>.</td></tr>
+<tr><td>Accidentally recorded a transaction</td><td>Use <strong>Undo last recorded action</strong> when available and check resulting holdings, cash, Jokers and contracts.</td></tr>
+<tr><td>Rival changes an offer</td><td>Record the new price or outcome in <strong>4. Opponents</strong>. Historical observations are not guaranteed current orders.</td></tr>
+<tr><td>Winning bid exceeds available cash</td><td>The auction's official obligation still applies. Immediately reconcile outstanding payment and contact the organizer if necessary; the model cannot void a bid.</td></tr>
+<tr><td>Need a clean restart</td><td>Click <strong>Reset entire game</strong> in the toolbar and confirm; it clears all three local Treasures &amp; Trash rounds, not the real exchange.</td></tr>
+</tbody></table></section>
+<section class="manual-section" id="finish"><div class="kicker">STOP TRADING</div><h2>Final physical inventory check</h2>
+<ul class="checks"><li>All starting and traded cards are accounted for; no private cards were shown to other teams.</li>
+<li>Cash equals initial cash plus received cash minus paid trades and auction payments.</li>
+<li>All won Jokers and bounty contracts are present and owed auction payments are settled.</li>
+<li>Any trade you recorded was physically completed, never merely discussed or accepted in principle.</li>
+<li>Score is reviewed for treasure/trash multipliers, matching ranks and the all-trash exception.</li>
+<li>Team submits its assets when instructed and switches to the next round's announced treasure suit.</li></ul></section></main></div><footer class="bottom"><a href="./">Back to live panel</a><a href="../">All five games</a><p>Follow the organizer's official auction deadlines and payment obligations. The tool records only your local decisions.</p></footer></div></body></html>
