@@ -45,7 +45,7 @@ test("malformed or crossed quotes are rejected rather than silently guessed",()=
 });
 test("duplicate symbols are treated as a paste error",()=>{
   const r=parseMarketText("GRID 399 400\nGRID 401 402");
-  assert.equal(r.valid,false);assert.match(r.errors.join(" "),"duplicate GRID");
+  assert.equal(r.valid,false);assert.match(r.errors.join(" "),/duplicate GRID/);
 });
 test("bridge sanitation ignores unrelated data and rejects unsupported formats",()=>{
   const result=sanitizeMarketSnapshot({
