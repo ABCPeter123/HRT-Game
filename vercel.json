@@ -2,5 +2,8 @@
   "version": 2,
   "buildCommand": "node scripts/build-site.mjs",
   "outputDirectory": "dist",
-  "framework": null
+  "framework": null,
+  "git": {
+    "deploymentEnabled": false
+  }
 }
