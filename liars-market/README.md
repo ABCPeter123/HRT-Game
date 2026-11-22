@@ -25,6 +25,10 @@ The panel presents **three steps for each sub-game**: **Deal cards → Claims & 
 
 To erase **every saved Liar's Market round and restart at Round 1, Hand 1**, use **Reset entire Game 5** in the top toolbar and confirm. Resetting this game does not clear other games. The main competition homepage also has an **Erase all saved game data** control for all implemented game panels. Both require confirmation.
 
+## Fastest no-typing claim and result flow
+
+The **Tap to build a claim** panel is expanded by default. Choose the hand class, main rank and (for two pair / full house) second rank; click **Set as latest claim**. Then tap one of the four **WHO SPOKE?** seat buttons. At the end, tap the actual **BLUFF correct/wrong**, **NUTS correct/wrong**, or timeout button and the **OTHER TEAM** seat. Check the point preview before **Record result + next**. No shorthand claim strings or seat numbers need typing. Text input and dropdowns remain optional alternatives.
+
 ## Fast turn workflow
 
 1. Select Round 1–3 and the sub-game. The four seats correspond to clockwise teams; set **My seat** once. Enter current scores so the model knows how many private cards the proctor deals to each team.
