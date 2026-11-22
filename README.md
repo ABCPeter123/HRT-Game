@@ -21,6 +21,10 @@ python -m http.server 8000
 
 Open `http://localhost:8000/` to select a game. Scavenger is at `/scavenger/`; Baskets is at `/baskets/`; Liar's Market is at `/liars-market/`; Treasures & Trash is at `/treasures-and-trash/`. Each runs without a backend or AI API, and saves observations in the local browser. Run `cd baskets && npm test`, `cd liars-market && npm test` or `cd treasures-and-trash && npm test` to validate the corresponding panel.
 
+Each implemented game has a **Reset entire game** button, distinct from per-round or timer reset. It clears only that game's saved browser data, after confirmation. The competition homepage includes an optional **Erase all saved game data** button that clears the four implemented panels. Vault currently has only a placeholder and no state to reset.
+
+Liar's Market now follows a continuous **Deal cards → Claims & calls → Record result** workflow. Recording a finished hand automatically advances to the next sub-game.
+
 **Production deployments are paused:** Vercel is configured not to deploy Git pushes. The deployed public URL may still serve the earlier Scavenger-only version. Ask explicitly before publishing new changes.
 
 ## Running AlgoArena
