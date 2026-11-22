@@ -46,6 +46,16 @@ function selectStage(stage){
 function resultPreview(){
   const g=game(),dest=$("result-summary");
   if(!dest)return;
+  document.querySelectorAll("[data-quick-outcome]").forEach(button=>{
+    const yes=button.dataset.quickOutcome===$("outcome").value;
+    button.classList.toggle("selected",yes);
+    button.setAttribute("aria-pressed",String(yes));
+  });
+  document.querySelectorAll("[data-quick-reactor]").forEach(button=>{
+    const yes=Number(button.dataset.quickReactor)===Number($("reactor").value);
+    button.classList.toggle("selected",yes);
+    button.setAttribute("aria-pressed",String(yes));
+  });
   if(!g.claim){dest.textContent="Enter the final claimed hand in Claims & calls first.";return;}
   const other=Number($("reactor").value),claimant=g.claimant;
   if(other===claimant){dest.textContent="Select the opposing team, not the claimant.";return;}
@@ -117,6 +127,11 @@ function renderClaimDisplay(){
   const g=game();
   $("claim-display").textContent=g.claim?formatClaim(g.claim):"None";
   $("claimant").value=String(g.claimant);
+  document.querySelectorAll("[data-quick-claimant]").forEach(button=>{
+    const yes=Number(button.dataset.quickClaimant)===g.claimant;
+    button.classList.toggle("selected",yes);
+    button.setAttribute("aria-pressed",String(yes));
+  });
 }
 function renderRoundControls(){
   $("rounds").innerHTML=[1,2,3].map(i=>'<button type="button" data-round="'+i+'" class="'+(state.round===i?"selected":"")+'">Round '+i+"</button>").join("");
@@ -273,6 +288,19 @@ $("max-games").addEventListener("change",e=>{
 $("my-seat").addEventListener("change",e=>{state.mySeat=Number(e.target.value);renderAll();});
 $("risk").addEventListener("change",e=>{state.risk=Number(e.target.value);store();calculate();});
 $("claimant").addEventListener("change",e=>{game().claimant=Number(e.target.value);store();calculate();});
+  document.getElementById("quick-claimant-seats").addEventListener("click",event=>{
+    const b=event.target.closest("[data-quick-claimant]");if(!b)return;
+    game().claimant=Number(b.dataset.quickClaimant);
+    store();renderClaimDisplay();calculate();
+  });
+  document.getElementById("quick-outcome-buttons").addEventListener("click",event=>{
+    const b=event.target.closest("[data-quick-outcome]");if(!b)return;
+    $("outcome").value=b.dataset.quickOutcome;resultPreview();
+  });
+  document.getElementById("quick-result-seat").addEventListener("click",event=>{
+    const b=event.target.closest("[data-quick-reactor]");if(!b)return;
+    $("reactor").value=b.dataset.quickReactor;resultPreview();
+  });
 $("apply-quick").addEventListener("click",()=>{
   const c=parseClaim($("claim-quick").value);
   if(!c){setNotice("Invalid claim. Example: 2P Q 8, FH 9 4, SF K.");return;}
