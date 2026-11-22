@@ -10,6 +10,12 @@ const money=n=>'$'+Number(n).toLocaleString('en-CA',{maximumFractionDigits:1});
 const pts=n=>Number(n).toLocaleString('en-CA',{maximumFractionDigits:1});
 const newRound=()=>({treasure:'H',cards:[],cash:500,jokers:0,contracts:[],offers:[],cutoffs:[],wins:[],undo:[],downside:35});
 const KEY='quant-comp-treasures-v1';
+document.getElementById("reset-game").addEventListener("click",()=>{
+  if(!window.confirm("Reset ALL Treasures & Trash data? This permanently erases all three rounds, cards, cash, auctions, trades, offers and saved settings. This cannot be undone."))return;
+  try{localStorage.removeItem(KEY);}
+  catch{window.alert("Could not clear saved data. Reset cancelled.");return;}
+  window.location.reload();
+});
 let data;try{data=JSON.parse(localStorage.getItem(KEY));}catch{data=null;}
 if(!data||!data.rounds||typeof data.rounds!=='object')data={activeRound:1,rounds:{1:newRound(),2:newRound(),3:newRound()}};
 let round=Number(data.activeRound)||1,state=data.rounds[round]||newRound(),selectedSuit='H',cardMode='add',tab='hand';
