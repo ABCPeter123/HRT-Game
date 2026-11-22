@@ -41,3 +41,15 @@ test("Vault live file build contains imported engine and independent reset",()=>
  assert.ok(home.includes("./vault/"));
  assert.ok(read("vault/index.html").includes('id="reset-game"'));
 });
+
+
+test("Vault chip pad supports one-tap values for partial, exact and combo references",()=>{
+ const html=read("vault/index.html"),js=read("vault/app.js");
+ for(const id of ["chip-tap-pad","chip-pad-targets","chip-pad-values","chip-pad-note","save-next-chip"])
+  assert.ok(html.includes('id="'+id+'"'),"Missing chip entry control "+id);
+ for(const target of ["partial-value","true-value","combo-a","combo-b","combo-value"])
+  assert.ok(js.includes('"'+target+'"'),"No button target for "+target);
+ assert.match(js,/data-chip-pad-number/);
+ assert.match(js,/state\.selected=currentRole\(\)==="maker"\?state\.selected%20\+1:state\.selected%30\+1/);
+ assert.match(js,/if\(!saveChip\(\)\)return/);
+});
