@@ -1,0 +1,37 @@
+name: Liar's Market decision panel
+
+on:
+  pull_request:
+    paths:
+      - 'liars-market/**'
+      - 'scripts/build-site.mjs'
+      - '.github/workflows/liars-market-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'liars-market/**'
+      - 'scripts/build-site.mjs'
+      - '.github/workflows/liars-market-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: liars-market
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check engine.js
+      - run: node --check app.js
+      - run: npm test
+      - run: node ../scripts/build-site.mjs
+      - run: test -f ../dist/liars-market/index.html && test -f ../dist/liars-market/engine.js && test -f ../dist/liars-market/app.js
