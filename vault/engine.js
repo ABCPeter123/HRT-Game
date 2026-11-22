@@ -108,8 +108,7 @@ export function chipPosterior(chips,{iterations=12}={}){
     PUB:Math.sqrt(sum(details.slice(0,20).map(x=>x.variance))),
     G5:Math.sqrt(sum(details.map(x=>x.probGT5*(1-x.probGT5))))
   };
-  const makerTrue=chips.map((c,i)=>i<20&&finite(c.trueValue));
-  const makerUnknownPublic=makerTrue.filter(x=>!x).length;
+  const makerUnknownPublic=chips.slice(0,20).filter(c=>!finite(c.trueValue)).length;
   const makerWidths={
     VAULT:Math.sqrt((makerUnknownPublic+10)*UNIFORM_VAR),
     PUB:Math.sqrt(makerUnknownPublic*UNIFORM_VAR),
