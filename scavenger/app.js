@@ -1,6 +1,7 @@
 import {
   PHASES, clamp, parseSamples, sampleHint, sampleCostFraction, estimatePool,
-  recommendBid, optimalFinalGuess, refinePoolFromResults, roundScore, guessPayout
+  recommendBid, optimalFinalGuess, refinePoolFromResults, inferOpponentProfiles,
+  OPPONENT_PROFILES, roundScore, guessPayout
 } from "./engine.js";
 
 const STORAGE_KEY = "quant-comp-scavenger-v1";
@@ -19,12 +20,12 @@ const format = (value, digits = 1) => Number.isFinite(value)
 const percent = (v) => format(100*v,1)+"%";
 
 function newRound() {
-  return {phase:0,percentile:"50",sampleCount:"0",samples:"",anchor:"",
+  return {phase:0,percentile:"",sampleCount:"0",samples:"",anchor:"",
     auctions:[{bid:"",rank:"",payout:""},{bid:"",rank:"",payout:""},{bid:"",rank:"",payout:""}],
     finalGuess:"",actualPool:""};
 }
 function defaultState() {
-  return {version:1,activeRound:0,roomSize:6,style:"normal",risk:0,
+  return {version:1,activeRound:0,roomSize:6,style:"auto",risk:0.35,
     rounds:Array.from({length:5},()=>newRound())};
 }
 function loadState() {
@@ -34,7 +35,7 @@ function loadState() {
     const clean=defaultState();
     clean.activeRound=clamp(number(raw.activeRound),0,4);
     clean.roomSize=raw.roomSize===7?7:6;
-    clean.style=["cautious","normal","aggressive"].includes(raw.style)?raw.style:"normal";
+    clean.style=["auto","cautious","normal","aggressive"].includes(raw.style)?raw.style:"auto";
     clean.risk=clamp(number(raw.risk),0,1);
     clean.rounds=raw.rounds.map(item=>({
       ...newRound(),...(item||{}),phase:clamp(number(item?.phase),0,4),
@@ -84,32 +85,35 @@ function samplePane() {
   const r=current(), suggested=sampleHint(number(r.percentile,50));
   return '<div class="field"><label for="percentile">Given distribution percentile</label>'+
     '<div class="stepper"><button type="button" class="step-btn" data-step="-1" aria-label="Percentile minus one">−</button>'+
-    '<input class="input" id="percentile" data-field="percentile" type="number" min="0" max="100" step="1" inputmode="numeric" value="'+escape(r.percentile)+'" aria-label="Given percentile">'+
+    '<input class="input" id="percentile" data-field="percentile" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="e.g. 80" value="'+escape(r.percentile)+'" aria-label="Given percentile">'+
     '<button type="button" class="step-btn" data-step="1" aria-label="Percentile plus one">+</button></div>'+
-    '<span class="hint">Enter the percentile the game shows, 0 to 100. The distribution family and parameters are unknown.</span></div>'+
+    '<span class="hint">Required. Copy the displayed percentile, not a sample value. Blank means no pool estimate yet.</span></div>'+
     '<div class="field"><div class="field-inline"><label>Number of samples purchased</label><span class="annotation" id="costAnnotation"></span></div>'+
     '<div class="choice-row" id="sampleChoices">'+[0,1,2,3,4,6,9].map(n=>
       '<button type="button" class="choice-btn mini'+(number(r.sampleCount)===n?' selected':'')+
       '" data-choice="sampleCount" data-value="'+n+'">'+n+'</button>').join("")+'</div>'+
-    '<span class="hint">Model starting point: '+suggested+' samples. This is a heuristic, not a proven optimal purchase.</span></div>'+
+    '<div class="field-inline small-manual"><label for="sampleCountManual">Or enter a custom count</label>'+
+    '<input class="input short-input" data-field="sampleCount" id="sampleCountManual" type="number" min="0" step="1" inputmode="numeric" value="'+escape(r.sampleCount)+'"></div>'+
+    '<span class="hint">Count of samples you ACTUALLY purchased, not merely typed. Model starting point: '+suggested+'. Sample cost grows as √n/12 of the pool.</span></div>'+
     '<div class="field"><label for="samples">Observed sample values</label>'+
     '<textarea id="samples" data-field="samples" class="textarea" inputmode="decimal" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="e.g. 420 520 390 610">'+escape(r.samples)+'</textarea>'+
-    '<span class="hint">Fast entry: type numbers separated by spaces, commas or new lines. Paste all at once if possible.</span></div>'+
+    '<span class="hint">Type or paste the values shown after purchase. Separate by spaces, commas, or new lines. Entries update the estimate immediately.</span></div>'+
     '<div class="field"><label for="anchor">Optional rough pool estimate (if no samples)</label>'+
     '<input class="input" data-field="anchor" id="anchor" type="number" inputmode="decimal" placeholder="Leave empty when using samples" value="'+escape(r.anchor)+'">'+
-    '<span class="hint">Percentile alone cannot determine the pool size. An estimate provides a provisional scale, not new evidence.</span></div>'+
+    '<span class="hint">Optional backup, only if you have no samples. A guess at the pool scale does not count as observed evidence.</span></div>'+
     '<button type="button" class="button secondary full" data-nav="1">Go to auction 1 →</button>';
 }
 function auctionPane(i) {
   const r=current(),a=r.auctions[i],third=i===2;
   return '<div class="field"><div class="field-inline"><label>Room size</label></div>'+
-    choiceButtons([[6,"6 players"],[7,"7 players"]],state.roomSize,"roomSize")+'</div>'+
-    '<div class="field"><label>Opponent bid model</label>'+
-    choiceButtons([["cautious","Cautious"],["normal","Typical"],["aggressive","Aggressive"]],state.style,"style")+
-    '<span class="hint">Change if previous bids ranked much lower or higher than expected. Recorded bid ranks adjust the next auction automatically.</span></div>'+
+    choiceButtons([[6,"6 players"],[7,"7 players"]],state.roomSize,"roomSize")+
+    '<span class="hint">Include yourself when counting the players in your room. Select 6 or 7 from the competition display.</span></div>'+
+    '<div class="field"><label>Opponent tendency (optional)</label>'+
+    choiceButtons([["auto","AUTO"],["cautious","Mostly low"],["normal","Mixed"],["aggressive","Mostly high"]],state.style,"style")+
+    '<span class="hint">AUTO updates probabilities using your bid rank after each auction. Choose a manual tendency only when you have independent evidence. Rival bids are not normally shown.</span></div>'+
     '<div class="field"><label for="risk">Downside sensitivity <span id="riskValue" class="annotation">'+(Math.round(state.risk*100))+'%</span></label>'+
     '<input id="risk" data-global-field="risk" type="range" min="0" max="100" step="10" value="'+Math.round(state.risk*100)+'" style="width:100%;accent-color:var(--teal)">'+
-    '<span class="hint">0% maximizes estimated average payout. Higher values penalize volatile outcomes.</span></div>'+
+    '<span class="hint">0% seeks the highest average payoff. At 100%, bid score subtracts 0.35 × simulated payout standard deviation. This does NOT cap losses. Use 35% as a cautious starting point.</span></div>'+
     '<div class="divider"></div>'+
     '<div class="field"><label for="actualBid">Your submitted bid</label>'+
     '<input id="actualBid" class="input" data-auction="'+i+'" data-auction-field="bid" type="number" inputmode="numeric" min="0" step="1" value="'+escape(a.bid)+'" placeholder="Use recommendation or enter actual bid"></div>'+
@@ -118,7 +122,8 @@ function auctionPane(i) {
       '<button type="button" class="choice-btn mini'+(number(a.rank)===j?' selected':'')+'" data-rank="'+j+'" data-auction="'+i+'">'+j+'</button>').join("")+'</div>'+
     '<span class="hint">1 = lowest bid, '+state.roomSize+' = highest bid. Leave empty before results.</span></div>'+
     '<div class="field"><label for="actualPayout">Your payout after this auction</label>'+
-    '<input id="actualPayout" class="input" data-auction="'+i+'" data-auction-field="payout" type="number" step="any" inputmode="decimal" value="'+escape(a.payout)+'" placeholder="Enter displayed points"></div>'+
+    '<input id="actualPayout" class="input" data-auction="'+i+'" data-auction-field="payout" type="number" step="any" inputmode="decimal" value="'+escape(a.payout)+'" placeholder="Enter displayed points">'+
+    '<span class="hint">Use the exact points shown in the result screen. Negative payout is possible if you were the highest bidder.</span></div>'+
     '<div class="row-note"><strong>Round '+(i+1)+' of 3'+(third?' · 2× weighted':'')+'.</strong> '+
     'The three lowest bids win their bids subject to the pool cap. The highest bid receives the remainder minus its absolute bid error. All other bids earn zero.</div>'+
     '<div class="spaced inline-actions"><button type="button" class="button secondary" data-nav="'+(i===2?4:i+2)+'">'+
@@ -156,6 +161,87 @@ function renderJournal() {
     '<div class="journal-bottom"><button type="button" class="lowkey" id="clearRound">Reset this round</button>'+
     '<span>Saved automatically</span></div>';
 }
+
+const GUIDE_COMMON=[
+  ["Round 1–5","Select the current round. Rooms change between rounds, so rival behavior is learned only within the selected round."],
+  ["Phase buttons","Use Info, A1, A2, A3, Final. Switch immediately when the official game advances."],
+  ["Timer","Tap Start when a phase starts. This is only your local countdown, not the official clock. Reset restarts this phase's countdown."]
+];
+const GUIDE_PHASES=[
+  [
+    ["Given percentile","Enter the percentile displayed by the game, like 80 for 80th percentile. It is not the pool size."],
+    ["Samples purchased","The number n you actually bought. Presets save taps; the custom box accepts other nonnegative integers. Fee = pool × √n / 12."],
+    ["Observed values","Enter the purchased sample values as shown, separated by spaces or commas, for example 380 450 590."],
+    ["Rough pool estimate","Optional fallback if you have no sample observations. It supplies only a provisional scale and may be badly wrong."]
+  ],
+  [
+    ["Room size","Count your own player plus competitors: 6 or 7 total."],
+    ["Opponent tendency","AUTO learns from your ranks in the same round. Mostly low, Mixed, and Mostly high are manual hypotheses, not confirmed opponent identities."],
+    ["Downside sensitivity","0–100% controls your simulated-risk penalty: score = expected payout − 0.35 × slider fraction × simulated payout SD. It cannot guarantee a maximum loss."],
+    ["Your submitted bid","Record the integer you actually placed in the competition, or tap Fill bid field to copy the suggested value into this panel."],
+    ["Your bid rank","After results, tap your rank. Rank 1 is the lowest bidder; rank 6 or 7 is the highest. The game provides your rank and payout, not rivals' full bids."],
+    ["Your payout","Enter your own actual auction points exactly, including negative payouts. This can tighten the pool estimate."],
+    ["Counterplay rows","The panel shows how you could respond if competitors were mostly low, mixed, or high bidders. They are scenario tests, not known opponent bids."]
+  ],
+  [
+    ["Your final guess","Use the integer in the recommendation and submit it on the competition screen. Fill final guess only records it in this panel."],
+    ["Actual pool size","Optional. Enter the revealed true pool afterward so your round score can be calculated."]
+  ]
+];
+function guideLine([label,description]) {
+  return '<div class="guide-line"><strong>'+escape(label)+'</strong><span>'+escape(description)+'</span></div>';
+}
+function renderGuide() {
+  const p=phase();
+  const stage=p===0?GUIDE_PHASES[0]:p===4?GUIDE_PHASES[2]:GUIDE_PHASES[1];
+  $("guideContent").innerHTML='<div class="guide-list">'+
+    GUIDE_COMMON.concat(stage).map(guideLine).join("")+'</div>';
+}
+function renderCounterplay(bidResult,pool) {
+  const p=phase(),r=current();
+  const through=Math.min(3,p);
+  const observations=r.auctions.slice(0,through).filter(a=>a.bid!==""&&a.rank!=="");
+  const profile=inferOpponentProfiles({estimate:pool,history:observations,
+    roomSize:state.roomSize,style:state.style,seed:state.activeRound*997+2026});
+  $("opponentStatus").textContent=profile.observations+" / 3 RANKS";
+  const top=OPPONENT_PROFILES.find(item=>item.key===profile.dominant);
+  const certainty=profile.observations===0?"Starting assumptions":profile.observations===1?"Limited evidence":"Updating from recorded ranks";
+  const items=OPPONENT_PROFILES.map(item=>{
+    const pct=Math.round(100*profile.weights[item.key]);
+    return '<div class="profile-line"><div><span>'+escape(item.label)+'</span><strong>'+pct+'%</strong></div>'+
+      '<div class="profile-track"><span style="width:'+pct+'%"></span></div></div>';
+  }).join("");
+  $("opponentInsights").innerHTML=
+    '<div class="profile-heading">'+escape(certainty)+'</div>'+
+    '<div class="profile-bars">'+items+'</div>'+
+    '<div class="row-note counter-tip"><strong>Counterplan:</strong> '+escape(top.counter)+'</div>'+
+    '<p class="hint">Percentages are estimates from rank outcomes and your selected crowd tendency. They are not measured proportions of players. Opponents change between rounds.</p>';
+  let candidates=bidResult;
+  let phaseLabel=p>=1&&p<=3?"Current auction":"";
+  const currentFinished=p>=1&&p<3&&r.auctions[p-1].bid!==""&&r.auctions[p-1].rank!=="";
+  if(currentFinished && pool) {
+    candidates=recommendBid({estimate:pool,roomSize:state.roomSize,
+      history:observations,style:state.style,risk:state.risk,
+      phase:p+1,seed:state.activeRound*997+2026});
+    phaseLabel="Next auction";
+  }
+  if(p===0){
+    $("opponentCounters").innerHTML='<p class="hint spaced">Auction counterbids appear when you reach Auction 1.</p>';
+  }else if(p===4){
+    $("opponentCounters").innerHTML='<p class="hint spaced">All auction ranks are logged. Focus on the final pool guess.</p>';
+  }else if(!candidates){
+    $("opponentCounters").innerHTML='<p class="hint spaced">Enter the percentile and sample values, or a manual pool estimate, to calculate counterbids.</p>';
+  }else{
+    $("opponentCounters").innerHTML='<div class="counter-title">COUNTERBIDS BY OPPONENT STRATEGY <span>'+escape(phaseLabel)+'</span></div>'+
+      '<div class="counter-grid">'+candidates.profileCounterBids.map(item=>
+        '<div class="counter-row"><div><strong>'+escape(item.label)+'</strong>'+
+        '<span>EV '+format(item.expected)+' pts · Loss '+percent(item.lossProbability)+'</span></div>'+
+        '<div class="counter-number">'+format(item.bid,0)+'</div></div>'
+      ).join("")+'</div>'+
+      '<p class="hint spaced">Each row assumes that particular crowd style dominates. The large recommendation above combines all three scenarios using their current estimated probabilities.</p>';
+  }
+}
+
 function render() {
   const r=current(),p=r.phase;
   $("roundButtons").innerHTML=state.rounds.map((round,i)=>
@@ -169,15 +255,17 @@ function render() {
   $("phaseTag").textContent=String(p+1).padStart(2,"0")+" / 05";
   $("inputFields").innerHTML=p===0?samplePane():p===4?finalPane():auctionPane(p-1);
   $("timerPhase").textContent=p===0?"INFO WINDOW":p===4?"FINAL GUESS":"BID WINDOW";
+  renderGuide();
   renderAdvice();
   renderJournal();
   renderTimer();
 }
 function renderAdvice() {
   const r=current(),p=r.phase;
-  const initialPool=estimatePool({percentile:number(r.percentile,50),samples:r.samples,anchor:r.anchor});
+  const initialPool=r.percentile===""?null:estimatePool({percentile:number(r.percentile),samples:r.samples,anchor:r.anchor});
   const pool=p===0?initialPool:refinePoolFromResults(initialPool,r.auctions.slice(0,p-1),state.roomSize);
   const cost=sampleCostFraction(number(r.sampleCount));
+  let currentBidResult=null;
   const metrics=[],set=(k,v)=>metrics.push(metric(k,v));
   $("confidenceChip").textContent=pool?.confidence||"NO SCALE";
   $("actionNumber").classList.remove("missing");
@@ -197,11 +285,12 @@ function renderAdvice() {
     const history=r.auctions.slice(0,p-1).filter(a=>a.bid!==""&&a.rank!=="");
     const result=recommendBid({estimate:pool,roomSize:state.roomSize,style:state.style,
       history,phase:p,risk:state.risk,seed:state.activeRound*997+2026});
+    currentBidResult=result;
     recommendation=result?.bid??null;
     $("actionLabel").textContent="Recommended integer bid"+(p===3?" · 2× round":"");
     $("actionNumber").textContent=result?format(result.bid,0):"Need estimate";
     $("actionNumber").classList.toggle("missing",!result);
-    $("actionSub").textContent=result?"Maximizes modeled payout"+(state.risk?" with downside control":""):"Enter samples or a rough pool estimate in Info";
+    $("actionSub").textContent=result?"Highest risk-adjusted payout across modeled rival strategies":"Enter the percentile and sample values, or a manual pool estimate, in Info";
     if(result){
       set("Expected payout",format(result.expected)+" pts");
       set("Positive payout",percent(result.winProbability));
@@ -210,7 +299,7 @@ function renderAdvice() {
       set("Rival bid adjustment",format(result.roomScale,2)+"×");
       set("Pool estimate",format(pool.value));
     } else {set("Available pool scale","None");set("Auction rank","1–3 or highest pays");}
-    $("modelNote").textContent="Optimizes expected payout across simulated pool values and opponent bids. Rank observations from earlier auctions update the rival bid model. Actual rival bids and distributions are unknown. Tied bids are modeled conservatively, after equal-priced rivals.";
+    $("modelNote").textContent="Combines low-, mixed- and high-bid opponent scenarios. Observed ranks from earlier auctions update their probabilities. Downside sensitivity penalizes payout volatility, not worst-case loss. Ties are modeled conservatively.";
     $("ruleReminder").innerHTML="<strong>Auction "+p+" of 3.</strong> One nonnegative integer bid. Lowest three bids get capped payouts. Highest gets remainder − |remainder − bid| and can lose points. Other ranks get 0. Auction 3 earns double points in the round score.";
   }else{
     const result=optimalFinalGuess(pool,{seed:state.activeRound*113+2026});
@@ -218,7 +307,7 @@ function renderAdvice() {
     $("actionLabel").textContent="Recommended final guess";
     $("actionNumber").textContent=result?format(result.guess,0):"Need estimate";
     $("actionNumber").classList.toggle("missing",!result);
-    $("actionSub").textContent=result?"Highest modeled expected final-guess points":"Enter samples or a rough pool estimate in Info";
+    $("actionSub").textContent=result?"Highest modeled expected final-guess points":"Enter the percentile and samples, or manual pool estimate, in Info";
     if(result){
       set("Expected guess payout",format(result.expected)+" pts");
       set("Chance to earn points",percent(result.chance));
@@ -229,6 +318,7 @@ function renderAdvice() {
     $("ruleReminder").innerHTML="<strong>90 seconds.</strong> Final guess reward is max(pool/4 − |guess − pool|, 0). Total round score is A1 + A2 + 2×A3 + final guess − pool×√n/12.";
   }
   $("metrics").innerHTML='<div class="metric-grid">'+metrics.join("")+'</div>';
+  renderCounterplay(currentBidResult,pool);
   const canUse=recommendation!==null;
   $("useSuggestion").disabled=!canUse;
   $("copySuggestion").disabled=!canUse;
@@ -292,12 +382,13 @@ function handleInput(e) {
     }
   }else return;
   save();
-  if(el.dataset.field==="percentile" || el.dataset.field==="samples" || el.dataset.field==="anchor" ||
-    el.dataset.field==="sampleCount" || el.dataset.globalField==="risk"){
+  if(el.dataset.field || el.dataset.auctionField || el.dataset.globalField==="risk"){
     clearTimeout(handleInput.delayed);
     handleInput.delayed=setTimeout(renderAdvice,70);
   }
   if(el.dataset.field==="sampleCount"||el.dataset.field==="samples") {
+    const b=document.querySelectorAll('[data-choice="sampleCount"]');
+    b.forEach(btn=>btn.classList.toggle("selected",Number(btn.dataset.value)===number(current().sampleCount)));
     const c=$("costAnnotation");if(c)c.textContent=percent(sampleCostFraction(number(current().sampleCount)))+" OF POOL";
   }
   renderJournal();

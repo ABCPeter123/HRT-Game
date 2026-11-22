@@ -43,6 +43,10 @@
             <span id="phaseTag" class="phase-tag">01 / 05</span>
           </div>
           <div id="inputFields"></div>
+          <details id="inputGuide" class="input-guide" open>
+            <summary>Input guide <span>What to enter and where to find it</span></summary>
+            <div id="guideContent" class="guide-content"></div>
+          </details>
         </section>
         <section class="panel secondary-panel" aria-labelledby="roundHeading">
           <div class="panel-top compact"><div><div class="eyebrow">ROUND JOURNAL</div><h2 id="roundHeading">Your progress</h2></div></div>
@@ -63,6 +67,14 @@
           <div class="divider"></div>
           <div id="metrics"></div>
           <p class="model-note" id="modelNote"></p>
+        </section>
+        <section class="panel opponent-panel" aria-labelledby="opponentHeading">
+          <div class="panel-top compact">
+            <div><div class="eyebrow">OPPONENT COUNTERPLAY</div><h2 id="opponentHeading">Adapt to the room</h2></div>
+            <span class="phase-tag" id="opponentStatus">SCENARIOS</span>
+          </div>
+          <div id="opponentInsights" aria-live="polite"></div>
+          <div id="opponentCounters"></div>
         </section>
         <section class="panel info-panel" aria-labelledby="quickHeading">
           <div class="eyebrow">SCORING RULE</div><h2 id="quickHeading">What matters</h2>

@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import {
   inverseNormal, parseSamples, sampleCostFraction, sampleHint,
   auctionPayout, guessPayout, roundScore, estimatePool,
-  optimalFinalGuess, recommendBid, inferRoomScale, refinePoolFromResults
+  optimalFinalGuess, recommendBid, inferRoomScale, refinePoolFromResults, inferOpponentProfiles, OPPONENT_PROFILES
 } from "../engine.js";
 
 test("sample parsing, costs and hint are consistent with the packet",()=>{
@@ -118,4 +118,66 @@ test("highest rank underpaid establishes residual lower bound",()=>{
   const prior=estimatePool({percentile:50,samples:"10 15 17 20 25"});
   const r=refinePoolFromResults(prior,[{bid:"100",rank:"6",payout:"-40"}],6);
   assert.ok(r.value>=30);
+});
+
+test("opponent profile weights are valid and ranks adapt their probabilities",()=>{
+  const e=estimatePool({percentile:70,samples:"90 105 120 100 112 132"});
+  const baseline=inferOpponentProfiles({estimate:e,history:[],style:"auto",roomSize:6});
+  assert.equal(baseline.observations,0);
+  assert.ok(Math.abs(Object.values(baseline.weights).reduce((a,b)=>a+b,0)-1)<1e-12);
+  const lowCrowd=inferOpponentProfiles({estimate:e,style:"auto",roomSize:6,
+    history:[{bid:String(Math.round(e.value*0.37)),rank:"6"}]});
+  const highCrowd=inferOpponentProfiles({estimate:e,style:"auto",roomSize:6,
+    history:[{bid:String(Math.round(e.value*0.37)),rank:"1"}]});
+  assert.equal(lowCrowd.observations,1);
+  assert.ok(lowCrowd.weights.cautious>highCrowd.weights.cautious,
+    "Being the highest bidder should increase belief in a low-bid room");
+  assert.ok(highCrowd.weights.aggressive>lowCrowd.weights.aggressive,
+    "Being the lowest bidder should increase belief in high-bid room");
+});
+test("missing, invalid or incomplete rank observations are safely ignored",()=>{
+  const e=estimatePool({percentile:50,samples:"40 50 60 80 90"});
+  const result=inferOpponentProfiles({estimate:e,roomSize:6,style:"auto",
+    history:[{bid:"100",rank:""},{bid:"",rank:"1"},{bid:"10",rank:"8"}]});
+  assert.equal(result.observations,0);
+  assert.ok(Math.abs(Object.values(result.weights).reduce((a,b)=>a+b,0)-1)<1e-12);
+});
+test("manual opponent assumptions create explainable priors while rank evidence still updates them",()=>{
+  const e=estimatePool({percentile:50,samples:"100 110 130 140 160"});
+  const conservative=inferOpponentProfiles({estimate:e,history:[],style:"cautious"});
+  const aggressive=inferOpponentProfiles({estimate:e,history:[],style:"aggressive"});
+  assert.ok(conservative.weights.cautious>aggressive.weights.cautious);
+  assert.ok(aggressive.weights.aggressive>conservative.weights.aggressive);
+  const updated=inferOpponentProfiles({estimate:e,roomSize:7,style:"cautious",
+    history:[{bid:"35",rank:"1"}]});
+  assert.equal(updated.observations,1);
+  assert.notDeepEqual(updated.weights,conservative.weights);
+});
+test("counterbids and defense statistics are returned for all three opponent scenarios",()=>{
+  const e=estimatePool({percentile:55,samples:"100 105 110 115 125 150"});
+  const r=recommendBid({estimate:e,roomSize:7,phase:3,risk:0.35,
+    history:[{bid:"36",rank:"2"},{bid:"65",rank:"6"}]});
+  assert.equal(r.profileCounterBids.length,3);
+  assert.equal(OPPONENT_PROFILES.length,3);
+  assert.ok(r.lossProbability>=0&&r.lossProbability<=1);
+  assert.ok(r.lowSlotProbability>=0&&r.lowSlotProbability<=1);
+  assert.ok(r.highestProbability>=0&&r.highestProbability<=1);
+  for(const alternative of r.profileCounterBids) {
+    assert.ok(Number.isInteger(alternative.bid) && alternative.bid>=0);
+    assert.ok(Number.isFinite(alternative.expected));
+    assert.ok(alternative.probability>=0 && alternative.probability<=1);
+  }
+  const weights=r.profileCounterBids.reduce((sum,item)=>sum+item.probability,0);
+  assert.ok(Math.abs(weights-1)<1e-12);
+  assert.ok(Number.isFinite(r.worstStyleExpected));
+});
+test("risk sensitivity does not claim an actual loss cap",()=>{
+  const e=estimatePool({percentile:85,samples:"60 70 100 130 170 220"});
+  for(const risk of [0,0.35,1]) {
+    const bid=recommendBid({estimate:e,risk,phase:2,scenarios:110});
+    assert.ok(Number.isFinite(bid.expected));
+    assert.ok(Number.isFinite(bid.objective));
+    assert.ok(Number.isFinite(bid.sd));
+    assert.ok(bid.lossProbability>=0&&bid.lossProbability<=1);
+  }
 });

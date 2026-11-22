@@ -241,64 +241,168 @@ export function inferRoomScale(history, estimate, roomSize=6) {
   const logAverage=scales.reduce((s,v)=>s+Math.log(v),0)/scales.length;
   return clamp(Math.exp(logAverage*0.45),0.65,1.65);
 }
+export const OPPONENT_PROFILES = [
+  {key:"cautious",label:"Low-bid crowd",counter:"Small bids crowd the three lowest slots. Compare a cheap qualifying bid with a well-calibrated highest bid."},
+  {key:"normal",label:"Mixed crowd",counter:"Use the balance of low-slot and highest-bid opportunities. Avoid the unpaid middle ranks."},
+  {key:"aggressive",label:"High-bid crowd",counter:"Larger bids leave room to win a low slot. Be careful when bidding high into the overbid penalty."}
+];
+const PROFILE_KEYS=OPPONENT_PROFILES.map(x=>x.key);
 function opponentBid(rng, estimateValue, style, roomScale) {
+  // A deliberately simple mixture: low-slot competitors and high/remainder hunters.
+  // Real rival bids are hidden by the packet, so this is scenario analysis, not observation.
   const variants={cautious:[0.72,0.20],normal:[1,0.31],aggressive:[1.22,0.44]};
-  const [scale, hunterProbability]=variants[style]||variants.normal;
-  const center=estimateValue*scale*roomScale;
-  const r=rng(), belief=clamp(1+gaussian(rng)*0.2,0.4,1.8);
+  const [scale,hunterProbability]=variants[style]||variants.normal;
+  const center=Math.max(0,estimateValue)*scale*roomScale;
+  const r=rng(),belief=clamp(1+gaussian(rng)*0.2,0.4,1.8);
   if(r<0.045)return 0;
   const fraction=r<hunterProbability+0.045 ? 0.56+0.52*rng() : 0.10+0.34*rng();
   return Math.max(0,Math.round(center*belief*fraction));
 }
-export function recommendBid({estimate, roomSize=6, history=[],style="normal",phase=1,seed=2026,
+function startingProfileWeights(style) {
+  const priors={
+    auto:[0.32,0.36,0.32],
+    cautious:[0.70,0.20,0.10],
+    normal:[0.18,0.64,0.18],
+    aggressive:[0.10,0.20,0.70]
+  };
+  return priors[style]||priors.auto;
+}
+function choose(n,k) {
+  if(k<0||k>n)return 0;
+  let c=1;
+  for(let j=1;j<=Math.min(k,n-k);j++)c=c*(n-j+1)/j;
+  return c;
+}
+export function inferOpponentProfiles({estimate,history=[],roomSize=6,style="auto",seed=2026}={}) {
+  const prior=startingProfileWeights(style), room=roomSize===7?7:6;
+  const evidence=history.filter(item=>item && item.bid!=="" && item.rank!=="" &&
+    item.bid!==null && item.rank!==null && Number.isFinite(Number(item.bid)) &&
+    Number.isInteger(Number(item.rank)) && Number(item.rank)>=1 && Number(item.rank)<=room);
+  const result=(weights,observations)=>({
+    weights:Object.fromEntries(PROFILE_KEYS.map((key,j)=>[key,weights[j]])),
+    observations,prior:style,dominant:PROFILE_KEYS[weights.indexOf(Math.max(...weights))],
+    evidenceLabel:observations?observations===1?"1 auction rank recorded":observations+" auction ranks recorded":"No auction results yet"
+  });
+  if(!estimate || !estimate.value || evidence.length===0)return result(prior,0);
+  const n=room-1;
+  const log=prior.map(w=>Math.log(w));
+  const rng=rngFromSeed(hashedSeed([seed,Math.round(estimate.value),"profile-evidence"]));
+  const perProfile=PROFILE_KEYS.map(key=>{
+    const bids=Array.from({length:320},()=>opponentBid(rng,estimate.value,key,1)).sort((a,b)=>a-b);
+    return bids;
+  });
+  for(const row of evidence) {
+    const bid=Math.max(0,Number(row.bid)), k=Number(row.rank)-1;
+    for(let j=0;j<3;j++){
+      const bids=perProfile[j];
+      let left=0,right=bids.length;
+      while(left<right){const mid=(left+right)>>1;if(bids[mid]<=bid)left=mid+1;else right=mid;}
+      const q=clamp(left/bids.length,0.02,0.98);
+      const likelihood=choose(n,k)*q**k*(1-q)**(n-k);
+      // Shrink evidence because bids are correlated and the model is only approximate.
+      log[j]+=0.65*Math.log(Math.max(1e-8,likelihood));
+    }
+  }
+  const top=Math.max(...log);
+  const w=log.map(x=>Math.exp(x-top)),sum=w.reduce((a,b)=>a+b,0);
+  return result(w.map(x=>x/sum),evidence.length);
+}
+function payoffAtBid(b,pool,rivals) {
+  let below=0;
+  for(const rival of rivals)if(rival<=b)below++;
+  const rank=below+1,room=rivals.length+1;
+  if(rank<=3){
+    let remain=pool;
+    for(let j=0;j<rank-1;j++)remain-=Math.min(remain,rivals[j]);
+    return {rank,payout:Math.min(Math.max(0,remain),b)};
+  }
+  if(rank===room){
+    let remain=pool;
+    for(let j=0;j<3;j++)remain-=Math.min(remain,rivals[j]);
+    return {rank,payout:remain-Math.abs(remain-b)};
+  }
+  return {rank,payout:0};
+}
+export function recommendBid({estimate,roomSize=6,history=[],style="auto",phase=1,seed=2026,
   scenarios=220,risk=0}={}) {
   if(!estimate)return null;
   const room=roomSize===7?7:6;
-  const rng=rngFromSeed(hashedSeed([seed,room,phase,style,estimate.value.toFixed(3),
-    ...history.map(x=>String(x.bid)+":"+String(x.rank))]));
-  const pools=posteriorDraws(estimate,scenarios,seed);
+  const profile=inferOpponentProfiles({estimate,roomSize:room,history,style,seed});
+  const rng=rngFromSeed(hashedSeed([seed,room,"opponent-scenarios"]));
+  const pools=posteriorDraws(estimate,Math.max(80,Math.min(600,scenarios)),seed);
   const roomScale=inferRoomScale(history,estimate,room);
-  const simulations=pools.map(p=>{
-    const rivals=Array.from({length:room-1},()=>opponentBid(rng,estimate.value,style,roomScale)).sort((a,b)=>a-b);
-    let residual=p;
-    for(let k=0;k<3;k++)residual-=Math.min(residual,rivals[k]);
-    return {p,rivals,residual:Math.max(0,residual)};
-  });
+  const simulations=pools.map(pool=>({
+    pool,rivals:PROFILE_KEYS.map(key=>Array.from({length:room-1},
+      ()=>opponentBid(rng,estimate.value,key,roomScale)).sort((a,b)=>a-b))
+  }));
   const upper=clamp(Math.ceil(Math.max(estimate.hi*1.35,estimate.value*1.7,10)),20,1e7);
-  const bids=new Set([0,1,Math.round(estimate.value/4),Math.round(estimate.value*0.7),
+  const candidates=new Set([0,1,Math.round(estimate.value/4),Math.round(estimate.value*0.7),
     Math.round(estimate.value),Math.round(estimate.value*1.15)]);
-  for(let k=0;k<=126;k++)bids.add(Math.round(upper*k/126));
-  const rankWeighted=phase===3?2:1;
-  const penalty=clamp(risk,0,1);
-  const scoreBid=(b)=>{
-    let sum=0,sumSq=0,losing=0,wins=0,rankSum=0;
-    for(const {p,rivals,residual} of simulations){
-      let below=0;
-      for(const x of rivals)if(x<=b)below++;
-      const rank=below+1;
-      let payoff=0;
-      if(rank<=3){
-        let remain=p;
-        for(let j=0;j<rank-1;j++)remain-=Math.min(remain,rivals[j]);
-        payoff=Math.min(Math.max(0,remain),b);
-      }else if(rank===room)payoff=residual-Math.abs(residual-b);
-      // Other bids have no payout.
-      sum+=payoff;sumSq+=payoff*payoff;rankSum+=rank;
-      if(payoff<0)losing++; if(payoff>0)wins++;
+  for(let k=0;k<=126;k++)candidates.add(Math.round(upper*k/126));
+  const phaseWeight=phase===3?2:1;
+  const penalty=clamp(risk,0,1)*0.35;
+  const scoreBid=b=>{
+    const sums=[0,0,0],squares=[0,0,0],positive=[0,0,0],negative=[0,0,0],ranks=[0,0,0],
+      lowRanks=[0,0,0],highRanks=[0,0,0];
+    for(const {pool,rivals} of simulations){
+      for(let j=0;j<3;j++){
+        const value=payoffAtBid(b,pool,rivals[j]);
+        const payoff=value.payout;
+        sums[j]+=payoff;squares[j]+=payoff*payoff;
+        if(payoff>0)positive[j]++;if(payoff<0)negative[j]++;
+        if(value.rank<=3)lowRanks[j]++;
+        if(value.rank===room)highRanks[j]++;
+        ranks[j]+=value.rank;
+      }
     }
-    const expected=sum/simulations.length, variance=Math.max(0,sumSq/simulations.length-expected*expected);
-    const objective=expected-penalty*0.35*Math.sqrt(variance);
-    return {bid:b,expected:expected*rankWeighted,objective:objective*rankWeighted,
-      lossProbability:losing/simulations.length,winProbability:wins/simulations.length,
-      rank:rankSum/simulations.length,sd:Math.sqrt(variance)*rankWeighted};
+    const count=simulations.length;
+    const profileScores=Object.fromEntries(PROFILE_KEYS.map((key,j)=>{
+      const expected=sums[j]/count,sd=Math.sqrt(Math.max(0,squares[j]/count-expected*expected));
+      return [key,{expected:expected*phaseWeight,sd:sd*phaseWeight,
+        score:(expected-penalty*sd)*phaseWeight,
+        winProbability:positive[j]/count,lossProbability:negative[j]/count,
+        lowSlotProbability:lowRanks[j]/count,highestProbability:highRanks[j]/count,
+        meanRank:ranks[j]/count}];
+    }));
+    let weightedMean=0,weightedSecond=0,wins=0,losses=0,lowSlot=0,highest=0,rank=0;
+    for(const key of PROFILE_KEYS){
+      const weight=profile.weights[key],x=profileScores[key];
+      weightedMean+=weight*x.expected;
+      weightedSecond+=weight*(x.sd*x.sd+x.expected*x.expected);
+      wins+=weight*x.winProbability;losses+=weight*x.lossProbability;
+      lowSlot+=weight*x.lowSlotProbability;highest+=weight*x.highestProbability;
+      rank+=weight*x.meanRank;
+    }
+    const sd=Math.sqrt(Math.max(0,weightedSecond-weightedMean*weightedMean));
+    return {bid:b,expected:weightedMean,objective:weightedMean-penalty*sd,
+      sd,winProbability:wins,lossProbability:losses,lowSlotProbability:lowSlot,
+      highestProbability:highest,rank,profileScores};
   };
-  let ranked=[...bids].filter(b=>b>=0).map(scoreBid).sort((a,b)=>b.objective-a.objective);
-  const top=ranked.slice(0,4).map(x=>x.bid);
+  let rated=[...candidates].filter(b=>b>=0).map(scoreBid).sort((a,b)=>b.objective-a.objective);
+  const bestCoarse=rated.slice(0,4).map(x=>x.bid);
   const step=Math.max(1,Math.round(upper/126));
   const refined=new Set();
-  for(const center of top)for(let d=-step;d<=step;d+=Math.max(1,Math.floor(step/7)))refined.add(Math.max(0,center+d));
-  ranked=ranked.concat([...refined].map(scoreBid)).sort((a,b)=>b.objective-a.objective);
-  return {...ranked[0],alternatives:ranked.filter(x=>Math.abs(x.bid-ranked[0].bid)>step*1.5).slice(0,2),
-    roomScale,phaseWeight:rankWeighted,scenarios:simulations.length,
+  for(const center of bestCoarse)for(let d=-step;d<=step;d+=Math.max(1,Math.floor(step/7))){
+    refined.add(Math.max(0,center+d));
+  }
+  rated=rated.concat([...refined].map(scoreBid)).sort((a,b)=>b.objective-a.objective);
+  const winners=PROFILE_KEYS.map(key=>{
+    let best=rated[0];
+    for(const b of rated)if(b.profileScores[key].score>best.profileScores[key].score)best=b;
+    return {style:key,label:OPPONENT_PROFILES.find(x=>x.key===key).label,bid:best.bid,
+      expected:best.profileScores[key].expected,
+      lossProbability:best.profileScores[key].lossProbability,
+      probability:profile.weights[key]};
+  });
+  const best=rated[0];
+  const spread=Math.max(1,step*1.5);
+  const alternatives=rated.filter(x=>Math.abs(x.bid-best.bid)>spread).slice(0,2).map(x=>({
+    bid:x.bid,expected:x.expected,lossProbability:x.lossProbability
+  }));
+  const worstStyle=PROFILE_KEYS.reduce((a,b)=>
+    best.profileScores[b].expected<best.profileScores[a].expected?b:a);
+  return {...best,alternatives,roomScale,phaseWeight,scenarios:simulations.length,
+    profile,profileCounterBids:winners,worstStyle,
+    worstStyleExpected:best.profileScores[worstStyle].expected,
     range:[quantile(pools,0.10),quantile(pools,0.90)]};
 }

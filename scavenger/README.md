@@ -20,6 +20,14 @@ Then visit \`http://localhost:8000/scavenger/\`. The panel uses native JavaScrip
 
 Shortcuts: Alt+1 to Alt+5 jump to a phase; Alt+Enter fills the current recommended action. The interface supports touch screens and mobile widths.
 
+## Quick input reference
+
+The panel now includes a collapsible **Input guide** for every field. Information-stage fields: percentile is the percentile shown by the organizer, sample count is the number purchased (presets or a custom integer), sample values are the numbers received, and manual pool estimate is optional when samples are missing. Auction fields: room size includes you, opponent tendency selects AUTO or a manual prior, downside sensitivity trades off expected payoff against payout volatility, your submitted bid stores your actual order, bid rank is the position the game displays (1 = lowest, 6 or 7 = highest), and payout is the actual points received, including negatives. Final fields: submitted guess is the number you submitted; actual pool is an optional post-round value for computing final scores. Round buttons, phase tabs and timer provide navigation and a reference countdown.
+
+Under each auction recommendation, the **Opponent counterplay** panel shows probabilities of the three crowd models and corresponding alternative bids. After you enter your rank, the next auction automatically adapts. These counterbids are conditional hypotheses; do not interpret them as exact knowledge of opponent bids.
+
+The live Vercel deployment is intentionally paused. Changes pushed to GitHub are not automatically published. Run the static server locally to test the latest changes, or explicitly request a deployment when ready.
+
 ## What the engine actually optimizes
 
 The information stage displays a *heuristic* 3-sample starting point, or 4 at extreme given percentiles. Buying n samples costs \`pool * sqrt(n) / 12\`. The engine does **not** call its sample-count recommendation mathematically optimal. That choice needs assumptions about the unknown pool distribution, competitor bidding, and the value of information.
@@ -33,7 +41,15 @@ Auction payouts follow the competition packet:
 - Middle bids receive zero.
 - Auction 3 receives twice the point weight in the total round score.
 
-The bid engine simulates possible pools, a mixture of low bids and high bids by opponents, and the exact payout rule. It searches integer bids and maximizes expected payout, optionally penalizing volatility. The "Opponent bid model" buttons and previously entered rank information alter assumptions about competitor bids. The default model is not learned from actual opponent bids, which the game does not promise to reveal. Equal-price ties use a conservative deterministic ordering, because the game packet does not specify tie resolution.
+The bid engine simulates possible pools and three opponent patterns (mostly low bidders, mixed bidding, and mostly high bidders) using the competition payout function. It searches integer bids and maximizes risk-adjusted expected payout. AUTO uses a starting prior across these three patterns, then updates its weights as each auction rank arrives. Choose a manual pattern only if you have independent evidence. The manual selection changes the prior; observed ranks still update it. The opponent panel displays scenario-specific counterbids, estimated profile probabilities and a counterplay note. The packet guarantees only your payout and bid rank after auctions, not a complete rival order book. All opponent types and percentages are estimates, not observed facts. Different rooms each round have different competitors, so the inference restarts for the next round.
+
+**Downside sensitivity** changes the risk-adjusted objective:
+
+```text
+bid score = expected payout - (0.35 × slider_fraction × simulated payout standard deviation)
+```
+
+At 0% the model maximizes expected auction payout; at 50% it subtracts 0.175 times the standard deviation, at 100% it subtracts 0.35 times the standard deviation. This is not a maximum-loss cap, drawdown constraint or certainty guarantee. The default is 35%. The third auction doubles the payout and risk term equally, so the weight alone does not necessarily change the optimal bid. Equal-price ties are modeled conservatively, because the packet does not specify tie resolution.
 
 The final-guess engine selects the integer guess maximizing estimated \`E[max(pool/4 - abs(guess-pool), 0)]\` over the pool scenarios. This differs from blindly rounding the sample mean.
 
