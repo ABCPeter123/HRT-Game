@@ -42,3 +42,16 @@ test("the status interface cannot submit actual exchange requests",()=>{
  assert.match(desk,/navigator\.clipboard/);
  assert.match(desk,/classifyPriceAlert/);
 });
+
+test("Game 2 offers an accessible no-typing status composer and typed fallback",()=>{
+ for(const id of ["quickCallId","quickStatusButtons","quickFillFields",
+  "quickQty","quickQtyButtons","quickPrice","quickUseLimit",
+  "quickPreview","quickError","quickApply","quickCopy"])
+  assert.ok(known.has(id),"Missing quick report control #"+id);
+ assert.match(html,/QUICK REPORT · NO COMMAND TYPING/);
+ assert.match(html,/Advanced: paste teammate's typed command instead/);
+ for(const status of ["ACK","WORKING","PARTIAL","FILLED","CANCELLED","REJECTED"])
+  assert.ok(desk.includes('["'+status+'"'),"No click option for "+status);
+ assert.match(desk,/composeQuickReply/);
+ assert.match(desk,/safeReport\(result\.update\.id,result\.update\)/);
+});
