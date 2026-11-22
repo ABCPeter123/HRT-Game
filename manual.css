@@ -41,3 +41,25 @@ pre code{padding:0;border:0;background:transparent;color:#d7eeef}
 .bottom a{margin-right:15px}
 @media(max-width:840px){.layout{display:block}.toc{position:static;display:flex;gap:7px;overflow:auto;margin-bottom:17px;padding:10px;align-items:center}.toc strong{margin:0 8px 0 0;flex:none}.toc a{white-space:nowrap;padding:7px}.twocol{grid-template-columns:1fr}.shell{padding:15px 14px 45px}section.manual-section{padding:17px 15px}.steps>li{padding-left:44px}.steps>li:before{left:10px}}
 @media print{*{color:#111!important;background:white!important;border-color:#bbb!important}html{font-size:11px}.shell{max-width:none;padding:0}.sitebar,.toc,.hero-actions,.bottom{display:none!important}.layout{display:block}section.manual-section{page-break-inside:avoid;border:0;border-bottom:1px solid #aaa;border-radius:0;margin:0;padding:11px 0}.steps>li{break-inside:avoid}h1{font-size:29px}h2{font-size:20px}}
+
+/* Manual reading mode on narrow phones: large targets, no clipped tables. */
+@media (max-width: 640px) {
+  .shell{padding:13px max(12px,env(safe-area-inset-left)) 48px max(12px,env(safe-area-inset-right))}
+  .hero{margin:18px 0 12px}
+  h1{font-size:clamp(28px,9vw,38px)}
+  .lead{font-size:15px}
+  .hero-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .hero-actions .button{text-align:center;min-height:44px;display:grid;place-items:center;padding:10px}
+  .hero-actions .button:first-child{grid-column:1/-1}
+  .manual-meta{gap:6px}
+  .manual-meta span{font-size:11px;padding:5px 7px}
+  .toc{position:sticky;top:0;z-index:5;box-shadow:0 7px 18px #08131dbb}
+  .toc a{min-height:44px;display:flex;align-items:center}
+  section.manual-section{padding:14px 12px}
+  .steps>li{padding:12px 10px 12px 42px}
+  .steps>li:before{left:10px;top:12px}
+  .manual-section table{display:block;overflow-x:auto;max-width:100%;-webkit-overflow-scrolling:touch}
+  .manual-section td,.manual-section th{min-width:120px;padding:9px}
+  pre{white-space:pre-wrap;overflow-wrap:anywhere}
+  .bottom a{display:inline-flex;padding:10px 0}
+}
