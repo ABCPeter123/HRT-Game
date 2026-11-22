@@ -71,6 +71,7 @@ function load(){
     fresh.desk={...emptyDesk(),
       calls:Array.isArray(older.calls)?older.calls.slice(-70).filter(c=>c&&SYMBOLS.includes(c.symbol)&&["BUY","SELL"].includes(c.side)&&typeof c.id==="string"):[],
       alerts:Array.isArray(older.alerts)?older.alerts.slice(-60).filter(a=>a&&SYMBOLS.includes(a.symbol)&&typeof a.id==="string"):[],
+      audit:Array.isArray(older.audit)?older.audit.slice(-30):[],
       nextCall:Number.isSafeInteger(older.nextCall)&&older.nextCall>0?older.nextCall:1,
       nextAlert:Number.isSafeInteger(older.nextAlert)&&older.nextAlert>0?older.nextAlert:1
     };
@@ -81,6 +82,8 @@ function load(){
 let state=load(),deadline=null,toaster,liveDecision=null,lastComputeTime=0;
 let bridgeActive=false,bridgeBusy=false,bridgeSequence=-1;
 let capturePositionSymbols=new Set(),captureOrderSymbols=new Set();
+let freshQuoteAt=new Map(),lastActionFreshSymbols="";
+ // Timestamp of a complete quote snapshot, not merely a connected bridge.
 const round=()=>state.rounds[state.round];
 const book=()=>round().books[state.selected];
 const flow=()=>round().flow[state.selected];
@@ -103,6 +106,7 @@ function chooseRound(index){
   elapsed();deadline=null;
   state.round=clamp(index,0,2);state.selected="GRID";
   bridgeSequence=-1;capturePositionSymbols.clear();captureOrderSymbols.clear();
+  freshQuoteAt.clear();
   deskUi.resetWatch();
   save();renderAll();
 }
@@ -312,6 +316,16 @@ function previewPastedMarket(){
   return parsed;
 }
 function applyMarketData(snapshot,source){
+  // Timestamp complete quotes, including identical repeats that prove a
+  // still-running feed. Missing one side does not refresh a book's age.
+  const now=Date.now(),wasStale=SYMBOLS.filter(sym=>
+    !freshQuoteAt.has(sym)||now-freshQuoteAt.get(sym)>4500);
+  for(const sym of SYMBOLS){
+    const fields=snapshot?.books?.[sym];
+    if(fields && fields.bid!==undefined && fields.ask!==undefined){
+      freshQuoteAt.set(sym,now);
+    }
+  }
   // Even an unchanged captured position must be marked as externally sourced,
   // or recording a local fill can double-count real inventory.
   if(source==="bridge"){
@@ -322,7 +336,11 @@ function applyMarketData(snapshot,source){
     }
   }
   const updated=mergeMarketSnapshot(round().books,snapshot);
-  if(!updated.changed)return updated;
+  if(!updated.changed){
+    if(bridgeActive && wasStale.some(sym=>freshQuoteAt.has(sym)&&now-freshQuoteAt.get(sym)<=4500))
+      renderDynamic();
+    return updated;
+  }
   if(source!=="bridge"){
     for(const sym of updated.updatedSymbols)capturePositionSymbols.delete(sym);
   }
@@ -363,6 +381,7 @@ async function pollBridge(){
     }
     const result=await response.json();
     if(result.stale||!result.snapshot){
+      if(freshQuoteAt.size){freshQuoteAt.clear();renderDynamic();}
       updateBridgeUI("AWAITING GAME",
         "Bridge connected, but there is no recent mapped data. Open the competition tab and start the extension.");
       return;
@@ -380,6 +399,7 @@ async function pollBridge(){
       applyMarketData(result.snapshot,"bridge");
     }
   }catch(error){
+    if(bridgeActive && freshQuoteAt.size){freshQuoteAt.clear();renderDynamic();}
     if(bridgeActive)updateBridgeUI("BRIDGE OFFLINE",
       "Cannot reach local server on 127.0.0.1:8765. Run node baskets/bridge/server.mjs.");
   }finally{bridgeBusy=false;}
@@ -392,15 +412,17 @@ function connectBridge(){
   if(!/^[a-f0-9]{36}$/i.test($("bridgeKey").value.trim())){
     toast("Paste the 36-character session key printed by the bridge server.");return;
   }
-  bridgeActive=true;bridgeSequence=-1;
+  bridgeActive=true;bridgeSequence=-1;freshQuoteAt.clear();
   $("connectBridge").disabled=true;$("disconnectBridge").disabled=false;
   updateBridgeUI("CONNECTING","Checking the local bridge...");
-  pollBridge();
+  renderDynamic();pollBridge();
 }
 function disconnectBridge(){
-  bridgeActive=false;capturePositionSymbols.clear();captureOrderSymbols.clear();bridgeSequence=-1;
+  bridgeActive=false;capturePositionSymbols.clear();captureOrderSymbols.clear();
+  freshQuoteAt.clear();bridgeSequence=-1;
   $("connectBridge").disabled=false;$("disconnectBridge").disabled=true;
   updateBridgeUI("NOT CONNECTED","Capture stopped. Manual quick-entry controls still work.");
+  renderDynamic();
 }
 setInterval(pollBridge,700);
 
@@ -413,7 +435,21 @@ function renderAll(){
   deskUi.renderAll();
 }
 function renderDynamic(){
-  const d=recommend({books:round().books,flow:round().flow,trust:state.trust,
+  // A connected read-only capture may show only one basket or pause in the
+  // background. Omit stale quotes from actionable recommendations, but keep
+  // position and open-order totals for inventory/risk accounting.
+  const booksForAction={...round().books};
+  if(bridgeActive){
+    const now=Date.now();
+    lastActionFreshSymbols=SYMBOLS.filter(sym=>
+      freshQuoteAt.has(sym)&&now-freshQuoteAt.get(sym)<=4500).join(",");
+    for(const sym of SYMBOLS){
+      if(!freshQuoteAt.has(sym)||now-freshQuoteAt.get(sym)>4500){
+        booksForAction[sym]={...booksForAction[sym],bid:"",ask:""};
+      }
+    }
+  }else lastActionFreshSymbols="";
+  const d=recommend({books:booksForAction,flow:round().flow,trust:state.trust,
     risk:state.risk,seconds:round().clock,maxOrder:state.maxOrder,observations:round().snapshots});
   renderSymbols(d);renderIndices(d.fair,round().books);renderBooks(d);
   renderDecision(d);renderTactics(d);renderPortfolio(d);
@@ -444,6 +480,7 @@ function captureSnapshot(quiet=false){
   }
   list.push({sym:state.selected,mid:quote.mid,spread:quote.spread,at:Date.now()});
   round().snapshots=list.slice(-50);
+  freshQuoteAt.set(state.selected,Date.now());
   save();deskUi.onQuoteUpdate([state.selected]);renderDynamic();
   if(!quiet)toast("Price snapshot saved for opponent analysis.");
 }
@@ -497,7 +534,9 @@ const deskUi=createDeskUI({
   getCapture:()=>({
     active:bridgeActive,
     positions:capturePositionSymbols,
-    orders:captureOrderSymbols
+    orders:captureOrderSymbols,
+    staleSymbols:bridgeActive?SYMBOLS.filter(sym=>
+      !freshQuoteAt.has(sym)||Date.now()-freshQuoteAt.get(sym)>4500):[]
   }),
   save,refresh:refreshAfterDeskReport,onFlow:deskFlowLog,toast
 });
@@ -547,6 +586,7 @@ document.addEventListener("change",event=>{
       round().snapshots.push({sym,mid:q.mid,spread:q.spread,at:Date.now()});
       round().snapshots=round().snapshots.slice(-50);save();
     }
+    if(q.valid)freshQuoteAt.set(sym,Date.now());
     deskUi.onQuoteUpdate([sym]);renderDynamic();
   }
   if(el.dataset.setting==="maxOrder"){
@@ -601,6 +641,13 @@ document.addEventListener("keydown",event=>{
   }
 });
 setInterval(()=>{
+  // Expire quotes if the browser's source tab stopped sending them. A stale
+  // quote must never remain eligible for a teammate call.
+  if(bridgeActive){
+    const freshNow=SYMBOLS.filter(sym=>
+      freshQuoteAt.has(sym)&&Date.now()-freshQuoteAt.get(sym)<=4500).join(",");
+    if(freshNow!==lastActionFreshSymbols)renderDynamic();
+  }
   const old=round().clock;
   timerRender();
   if(deadline!==null&&round().clock<=0){

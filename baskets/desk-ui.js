@@ -5,7 +5,8 @@
  */
 import {SYMBOLS,validateBook,finite} from "./engine.js";
 import {emptyDesk,createCall,teammateCallText,parseTeammateStatus,updateCall,
-  observeRepricing,addPriceAlert,classifyPriceAlert,pendingAlerts} from "./desk-engine.js";
+  observeRepricing,addPriceAlert,classifyPriceAlert,pendingAlerts,
+  accountingSnapshot,undoReportedStatus} from "./desk-engine.js";
 
 const $=id=>document.getElementById(id);
 const escape=x=>String(x??"").replace(/[&<>"']/g,ch=>
@@ -59,7 +60,9 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
   function renderRecommendation(decision=getDecision()){
     if(!decision)return;
     const best=decision.best;
-    $("deskFeedStatus").textContent=getCapture().active?"LOCAL CAPTURE":"MANUAL INPUTS";
+    const capture=getCapture();
+    $("deskFeedStatus").textContent=capture.active?
+      ((3-(capture.staleSymbols||[]).length)+"/3 FRESH BOOKS"):"MANUAL INPUTS";
     const unresolved=(getRound().desk?.calls||[]).filter(active);
     const duplicate=best&&unresolved.some(c=>c.symbol===best.symbol&&c.side===best.side&&
       c.qty===best.qty&&c.price===best.price);
@@ -82,7 +85,10 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
     $("deskLiveRecommendation").innerHTML=primary+
       '<div class="desk-live-note">'+(duplicate?
         'The same unresolved order is already in your handoff queue. Wait for your teammate or update its status.':
-        'This is an opportunity estimate, not an execution guarantee. Check current quotes before relaying it.')+'</div>'+
+        'This is an opportunity estimate, not an execution guarantee. Check current quotes before relaying it.')+
+      (capture.active&&(capture.staleSymbols||[]).length?
+        ' Live capture is stale or missing for '+escape(capture.staleSymbols.join(", "))+'. Those books are excluded from new calls.':"")+
+      '</div>'+
       (alternatives?'<div class="desk-live-alternatives">'+alternatives+'</div>':"");
     counters();
   }
@@ -101,8 +107,9 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
       '</div>'+
       '<div class="desk-call-actions">'+
       '<button type="button" class="button ghost small" data-copy-call="'+escape(call.id)+'">Copy instruction</button>'+
-      (!closed?'<button type="button" class="button small" data-call-status="ACK" data-call-id="'+escape(call.id)+'">Acknowledged</button>'+
-      '<button type="button" class="button small" data-call-status="WORKING" data-call-id="'+escape(call.id)+'">Order working</button>'+
+      (!closed?
+      (call.status==="CALLED"?'<button type="button" class="button small" data-call-status="ACK" data-call-id="'+escape(call.id)+'">Acknowledged</button>':"")+
+      (["CALLED","ACK"].includes(call.status)?'<button type="button" class="button small" data-call-status="WORKING" data-call-id="'+escape(call.id)+'">Order working</button>':"")+
       '<button type="button" class="button ghost small" data-call-status="CANCELLED" data-call-id="'+escape(call.id)+'">Cancelled</button>'+
       ((call.filledQty||0)===0?'<button type="button" class="button ghost small" data-call-status="REJECTED" data-call-id="'+escape(call.id)+'">Rejected</button>':""):"")+
       '</div>'+
@@ -121,6 +128,7 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
     $("deskCallList").innerHTML=rows.length?
       '<div class="desk-call-list">'+rows.slice(0,20).map(renderCallCard).join("")+'</div>':
       '<div class="desk-call-empty">No calls yet. Once a live recommendation is available, copy it to your teammate and track the response here.</div>';
+    $("undoTeammateStatus").disabled=!(currentDesk().audit||[]).length;
     counters();
   }
   async function copyToClipboard(message){
@@ -167,6 +175,12 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
     }
     r.books[call.symbol]=result.book;
     r.desk.calls[index]=result.call;
+    r.desk.audit=(r.desk.audit||[]).concat([{
+      id,priorCall:{...call},afterCall:{...result.call},
+      beforeLedger:accountingSnapshot(previous),
+      afterLedger:accountingSnapshot(result.book),
+      fillAdded:result.fillDelta>0,fillQty:result.fillDelta
+    }]).slice(-30);
     if(result.fillDelta>0){
       const executionPrice=Math.round(result.notionalDelta/result.fillDelta*100)/100;
       r.fills.push({
@@ -180,6 +194,36 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
     toast(id+": "+result.call.status+
       (result.fillDelta?" · "+result.fillDelta+" new executed shares":""));
   }
+  function undoLastReport(){
+    const r=getRound(),logs=r.desk.audit||[];
+    const last=logs.at(-1);
+    if(!last){toast("No teammate status to correct.");return;}
+    const index=r.desk.calls.findIndex(c=>c.id===last.id);
+    if(index<0){toast("The original call is missing.");return;}
+    if(last.fillAdded){
+      const recorded=r.fills.at(-1);
+      if(!recorded||!recorded.viaDesk||recorded.orderId!==last.id||
+        recorded.qty!==last.fillQty){
+        toast("Another fill was recorded afterward. Cannot safely undo this report.");return;
+      }
+    }
+    try{
+      const restored=undoReportedStatus(r.books[r.desk.calls[index].symbol],
+        r.desk.calls[index],{
+          id:last.id,beforeCall:last.priorCall,afterCall:last.afterCall,
+          beforeLedger:last.beforeLedger,afterLedger:last.afterLedger
+        });
+      if(!window.confirm("Correct the latest LOCAL teammate status ("+last.id+
+        ")? This does not cancel or reverse any real exchange trade."))return;
+      r.books[r.desk.calls[index].symbol]=restored.book;
+      r.desk.calls[index]=restored.call;
+      r.desk.audit.pop();
+      if(last.fillAdded)r.fills.pop();
+      save();renderCalls();renderRecommendation();refresh();
+      toast("Local report reverted. Enter the correct teammate update.");
+    }catch(error){toast(error.message);}
+  }
+
   function safeReport(id,update){
     try{report(id,update);return true;}
     catch(error){toast(error.message);return false;}
@@ -190,6 +234,43 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
       return safeReport(parsed.id,parsed);
     }catch(error){toast(error.message);return false;}
   }
+  function desktopAlertStatus(){
+    const status=$("desktopAlertStatus");
+    const supported=typeof Notification!=="undefined";
+    const permission=supported?Notification.permission:"unsupported";
+    status.textContent=permission==="granted"?
+      "Desktop notifications enabled. Alerts may appear when the game tab is active.":
+      permission==="denied"?
+      "Desktop notifications blocked by Chrome. The in-app queue still works.":
+      supported?
+      "In-app alerts always work. Click Enable desktop notifications to request browser permission.":
+      "This browser does not support desktop notifications here. In-app alerts remain available.";
+    $("enableDesktopAlerts").disabled=permission==="granted"||!supported;
+  }
+  async function enableDesktopNotifications(){
+    if(typeof Notification==="undefined"){toast("Desktop notifications are not supported here.");return;}
+    try{
+      const permission=await Notification.requestPermission();
+      desktopAlertStatus();
+      toast(permission==="granted"?
+        "Desktop alerts enabled for this browser.":"Desktop alerts unavailable. The in-app alert queue remains active.");
+    }catch{toast("Chrome did not allow notification permission here.");}
+  }
+  function notifyDesktop(alert){
+    if(typeof Notification==="undefined"||Notification.permission!=="granted"||!document.hidden)return;
+    try{
+      const notification=new Notification("Baskets: "+alert.symbol+" repriced "+(alert.delta>0?"UP":"DOWN"),{
+        body:money(alert.from)+" → "+money(alert.to)+". Review possible event activity.",
+        tag:"baskets-"+alert.id
+      });
+      notification.onclick=()=>{
+        try{window.focus();selectAlert(alert.id);notification.close();}catch{}
+      };
+    }catch{
+      // Chrome may prohibit notifications even after permission. Keep in-app queue.
+    }
+  }
+
   function openPrompt(alert){
     if(!alert||prompted.has(alert.id))return;
     $("signalPromptTitle").textContent=alert.symbol+" moved "+(alert.delta>0?"UP":"DOWN");
@@ -198,6 +279,7 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
       (alert.windowMs/1000).toFixed(1)+"s. Was this event-bot activity or ordinary repricing?";
     $("signalPrompt").dataset.alertId=alert.id;
     $("signalPrompt").hidden=false;
+    notifyDesktop(alert);
   }
   function selectAlert(id){
     const a=currentDesk().alerts.find(x=>x.id===id);
@@ -289,6 +371,7 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
   }
   function renderAll(){
     if(lastQuoteRound!==getState().round)resetWatch();
+    desktopAlertStatus();
     $("alertTicks").value=String(getState().alertTicks||3);
     tab(getState().workspaceTab||"desk");
     renderCalls();renderSignals();renderRecommendation();
@@ -297,6 +380,8 @@ export function createDeskUI({getState,getRound,getDecision,getCapture,save,refr
     const button=event.target.closest("button");if(!button)return;
     if(button.dataset.workflowTab)return tab(button.dataset.workflowTab);
     if(button.id==="openAnalysis")return tab("analysis");
+    if(button.id==="enableDesktopAlerts")return enableDesktopNotifications();
+    if(button.id==="undoTeammateStatus")return undoLastReport();
     if(button.id==="callTeammate")return callTeammate();
     if(button.dataset.copyCall){
       const call=currentDesk().calls.find(c=>c.id===button.dataset.copyCall);

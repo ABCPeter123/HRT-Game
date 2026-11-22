@@ -6,7 +6,7 @@
 import {SYMBOLS,capacities,tickValid,validateBook,finite} from "./engine.js";
 export const STATUSES=["CALLED","ACK","WORKING","PARTIAL","FILLED","CANCELLED","REJECTED"];
 export const CLASSIFICATIONS=["suspected","confirmed","tape","reviewed","dismissed"];
-export function emptyDesk(){return {calls:[],alerts:[],nextCall:1,nextAlert:1};}
+export function emptyDesk(){return {calls:[],alerts:[],audit:[],nextCall:1,nextAlert:1};}
 const positiveInteger=x=>Number.isSafeInteger(Number(x))&&Number(x)>0;
 const cents=x=>Math.round(Number(x)*100)/100;
 export function createCall(desk,action,roundNumber,at=Date.now()){
@@ -151,3 +151,22 @@ export function classifyPriceAlert(alert,kind,{direction=null,volume=null,at=Dat
    volume:Number(volume)*direction,reviewedAt:at};
 }
 export function pendingAlerts(desk){return (desk.alerts||[]).filter(a=>a.status==="PENDING");}
+
+const ACCOUNTING_FIELDS=["position","cash","openBuys","openSells","ledgerComplete"];
+export function accountingSnapshot(book){
+ return Object.fromEntries(ACCOUNTING_FIELDS.map(key=>[key,book?.[key]]));
+}
+export function undoReportedStatus(book,call,audit){
+ if(!audit||audit.id!==call?.id||!audit.afterCall||!audit.beforeCall)
+   throw new Error("No matching latest teammate status to undo.");
+ if(call.status!==audit.afterCall.status||call.filledQty!==audit.afterCall.filledQty||
+   call.filledNotional!==audit.afterCall.filledNotional||
+   call.updatedAt!==audit.afterCall.updatedAt)
+   throw new Error("This call has changed since the report. Cannot safely undo.");
+ const current=accountingSnapshot(book);
+ for(const key of ACCOUNTING_FIELDS){
+   if(String(current[key])!==String(audit.afterLedger?.[key]))
+     throw new Error("Inventory or working orders changed since that report. Reconcile the game first.");
+ }
+ return {call:{...audit.beforeCall},book:{...book,...audit.beforeLedger}};
+}

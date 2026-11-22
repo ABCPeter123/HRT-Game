@@ -34,6 +34,8 @@ The execution desk separates four actions that must not be confused:
 
 All recorded calls, statuses and alerts are saved by competition round in browser localStorage. The active-call counter helps you track orders awaiting a reply. The teammate does not automatically receive a message, and there is no real-time shared multi-device database. Exchange order placement and teammate communications take place outside the app.
 
+If you enter the wrong status, **Correct last local status** safely rolls back the most recent teammate report, including its locally recorded fill and position change. It refuses to roll back if another fill or inventory change happened afterward. This correction affects only your local model; it **does not cancel or reverse an exchange order or fill**. After correcting, enter the accurate cumulative status from the teammate.
+
 **Inventory accounting:** When a WORKING order is manually confirmed, its unfilled shares enter the appropriate open-buy/open-sell total. Partial fills reduce the outstanding shares and adjust filled position and cash. Cancellation or rejection releases the remaining reservation. The app enforces the exchange's worst-case ±1,000 per-basket capacity when accepting a status. If the browser extension is already reading live position and open-order totals, those mapped values take priority, and manual execution reports do not add the same fill or order a second time. An imported position without a complete transaction ledger cannot produce trustworthy historical PnL. Do not also enter these same orders independently in the manual working-order fields, or you can count them twice.
 
 **Important:** A pasted \`FILLED\` report is a teammate's statement, not an independent exchange confirmation. Check the reported shares and price against the actual game before using it. The full-fill report must equal the requested quantity. Use PARTIAL when only part of the order executed. The legacy manual fill journal remains available in Market analysis / setup.
@@ -47,6 +49,10 @@ The **Price alerts** tab monitors changes in *valid quoted basket midpoints*. It
 - **Confirmed event:** Only when you can reliably identify the event bot and know the executed volume. Adds the exact signed event volume to the official settlement formula.
 - **Ordinary public tape:** Adds user-observed trade volume as public tape. It never affects theoretical settlement.
 - **Reviewed, no volume evidence / Dismiss:** Records the alert without modifying event volume.
+
+**Optional desktop notifications:** From the Price alerts tab, click **Enable desktop notifications** to request browser permission. When permission is granted, the page can also show a Chrome desktop notification for a newly detected move while you are using the game tab. The in-page popup and queued review history work without desktop permission. If browser background throttling suspends the page, a notification may be delayed or never appear.
+
+**Live quote freshness:** Once the local capture bridge is connected, the execution model only treats baskets with a complete bid and ask received in the last **4.5 seconds** as eligible for a new teammate call. Books omitted from the feed are kept in storage for reference but excluded from live trade suggestions until fresh data arrives. The desk shows a fresh-book count and lists stale instruments. Manual-only mode still relies on your judgment about how recently quotes were entered.
 
 **Price movement by itself is not event-bot flow.** The app never converts a $1.50 repricing into an invented number of event-bot shares, nor automatically adjusts settlement from the price delta. Buy- and sell-initiated volume must be confirmed by the user independently of the price direction. Your classification can also disagree with the price direction. Multiple alerts may be queued for review; the in-app pop-up offers **Review and classify** or **Later**.
 

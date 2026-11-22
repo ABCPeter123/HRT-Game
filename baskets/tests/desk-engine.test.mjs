@@ -2,7 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {emptyBook,emptyRound} from "../engine.js";
 import {emptyDesk,createCall,teammateCallText,parseTeammateStatus,
- updateCall,observeRepricing,addPriceAlert,classifyPriceAlert,pendingAlerts} from "../desk-engine.js";
+ updateCall,observeRepricing,addPriceAlert,classifyPriceAlert,pendingAlerts,
+ accountingSnapshot,undoReportedStatus} from "../desk-engine.js";
 const action={symbol:"GRID",side:"BUY",qty:20,price:399.5,kind:"MAKE"};
 const make=()=>createCall(emptyDesk(),action,1,1000).call;
 test("teammate call has stable reference, executable details and explicit response syntax",()=>{
@@ -164,4 +165,37 @@ test("fifty fast quote updates and status transitions remain responsive",()=>{
   updateCall(emptyBook(),call,{status:"WORKING"});
  }
  assert.ok(performance.now()-start<1000);
+});
+
+test("correction reverses latest local report without rolling back a new market quote",()=>{
+ const call=make(),previous=emptyBook(),completed=updateCall(previous,call,{status:"WORKING"});
+ const audit={id:call.id,beforeCall:call,afterCall:completed.call,
+  beforeLedger:accountingSnapshot(previous),afterLedger:accountingSnapshot(completed.book)};
+ const changedQuote={...completed.book,bid:"400",ask:"401"};
+ const corrected=undoReportedStatus(changedQuote,completed.call,audit);
+ assert.equal(corrected.call.status,"CALLED");
+ assert.equal(corrected.book.openBuys,"0");
+ assert.equal(corrected.book.bid,"400","Latest quote must be preserved");
+ assert.equal(previous.openBuys,"0");
+});
+test("correction rejects a call or inventory modified after the report",()=>{
+ const call=make(),old=emptyBook(),work=updateCall(old,call,{status:"WORKING"});
+ const audit={id:call.id,beforeCall:call,afterCall:work.call,
+  beforeLedger:accountingSnapshot(old),afterLedger:accountingSnapshot(work.book)};
+ assert.throws(()=>undoReportedStatus({...work.book,openBuys:"21"},work.call,audit),/changed/);
+ const after=updateCall(work.book,work.call,{status:"PARTIAL",qty:5,price:399.5});
+ assert.throws(()=>undoReportedStatus(after.book,after.call,audit),/changed/);
+});
+test("local status snapshots distinguish working reservations from actual fills",()=>{
+ const call=make(),book=emptyBook();
+ const before=accountingSnapshot(book);
+ const after=updateCall(book,call,{status:"FILLED",qty:20,price:399.5});
+ assert.equal(before.openBuys,"0");
+ assert.equal(accountingSnapshot(after.book).position,"20");
+ const undo=undoReportedStatus(after.book,after.call,{
+   id:call.id,beforeCall:call,afterCall:after.call,
+   beforeLedger:before,afterLedger:accountingSnapshot(after.book)
+ });
+ assert.equal(undo.book.position,"0");
+ assert.equal(undo.book.cash,"0");
 });
