@@ -58,3 +58,16 @@ test("Homepage reset clears only the four game keys with user confirmation",()=>
     "quant-comp-treasures-v1","wqc-liars-market-v1"])assert.ok(home.includes(key));
   assert.doesNotMatch(home,/localStorage\.clear\(/);
 });
+
+
+test("Game 5 supports click-only claim, claimant, challenge outcome and rival selection",()=>{
+ const html=read("liars-market/index.html"),js=read("liars-market/app.js");
+ assert.match(html,/<details class="compact-details" open>/);
+ for(const id of ["claim-types","claim-ranks","claim-second","apply-taps",
+  "quick-claimant-seats","quick-outcome-buttons","quick-result-seat"])
+  assert.ok(html.includes('id="'+id+'"'),"Missing tap control "+id);
+ for(const data of ["data-quick-claimant","data-quick-outcome","data-quick-reactor"])
+  assert.ok(html.includes(data),"Missing "+data);
+ for(const key of ["quickClaimant","quickOutcome","quickReactor"])assert.ok(js.includes(key));
+ assert.match(js,/resultPreview\(\)/);
+});
