@@ -1,13 +1,13 @@
 # Competition data / user-provided datasets
-/data/
+**/data/
 *.parquet
 *.pkl
 *.pickle
 
 # Competition submissions and experiments
-/predictions.csv
-/runs/
-/algoarena_debug*/
+**/predictions.csv
+**/runs/
+**/algoarena_debug*/
 
 # Python notebook / environment
 __pycache__/
