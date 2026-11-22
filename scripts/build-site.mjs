@@ -17,7 +17,12 @@ const required=[
   "baskets/engine.js",
   "baskets/import.js",
   "baskets/styles.css",
-  "baskets/README.md"
+  "baskets/README.md",
+  "liars-market/index.html",
+  "liars-market/app.js",
+  "liars-market/engine.js",
+  "liars-market/styles.css",
+  "liars-market/README.md"
 ];
 rmSync(output,{recursive:true,force:true});
 for(const relative of required) {
