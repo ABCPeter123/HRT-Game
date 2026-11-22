@@ -22,7 +22,12 @@ const required=[
   "liars-market/app.js",
   "liars-market/engine.js",
   "liars-market/styles.css",
-  "liars-market/README.md"
+  "liars-market/README.md",
+  "treasures-and-trash/index.html",
+  "treasures-and-trash/app.js",
+  "treasures-and-trash/engine.js",
+  "treasures-and-trash/styles.css",
+  "treasures-and-trash/README.md"
 ];
 rmSync(output,{recursive:true,force:true});
 for(const relative of required) {

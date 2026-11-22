@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0c111b">
+<title>Game 4: Treasures &amp; Trash | Quant Comp 2026</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<div class="shell">
+<header class="masthead">
+  <a href="../" class="back">← All competition games</a>
+  <div class="eyebrow">WATERLOO QUANT CLUB / GAME 04</div>
+  <h1>Treasures &amp; Trash</h1>
+  <p>Value the hand you actually hold, price every trade, and cap auction bids in seconds. Local calculations only.</p>
+  <div class="toolbar">
+    <div class="round-switch" id="round-buttons" role="group" aria-label="Round"></div>
+    <label class="inline-field">Treasure suit <select id="treasure-suit"><option value="H">♥ Hearts</option><option value="D">♦ Diamonds</option><option value="S">♠ Spades</option><option value="C">♣ Clubs</option></select></label>
+    <span class="quiet" id="suit-explain"></span>
+  </div>
+</header>
+<main>
+<section class="hero" aria-live="polite">
+  <div class="eyebrow">BEST IMMEDIATE TRADE TARGET</div>
+  <div class="hero-title" id="best-move">ENTER YOUR NINE CARDS</div>
+  <p id="best-reason">Tap cards in the Hand tab. Recommendations update as your holdings change.</p>
+  <div class="score-strip">
+    <div><span>Current confirmed score</span><strong id="score-exact">500</strong></div>
+    <div><span>Estimated including contracts</span><strong id="score-expected">500</strong></div>
+    <div><span>Cash</span><strong id="score-cash">$500</strong></div>
+    <div><span>Cards / Jokers</span><strong id="score-cards">0 / 0</strong></div>
+  </div>
+</section>
+<div class="tabs" id="tabs" role="tablist" aria-label="Decision workspace">
+  <button type="button" class="tab selected" data-tab="hand">1. Hand &amp; prices</button>
+  <button type="button" class="tab" data-tab="trade">2. Trade calculator</button>
+  <button type="button" class="tab" data-tab="auction">3. Auctions</button>
+  <button type="button" class="tab" data-tab="opponents">4. Opponents</button>
+</div>
+<section class="workspace active" id="tab-hand">
+  <div class="twocol">
+    <section class="panel">
+      <h2>Enter and update your hand</h2>
+      <p>Tap a suit, then tap ranks to add cards. Remove mode deletes one copy. Duplicates are allowed up to the deck supply.</p>
+      <div class="control-row" id="suit-picker"></div>
+      <div class="control-row"><button type="button" class="mode-button active" data-mode="add">+ Add cards</button><button type="button" class="mode-button" data-mode="remove">− Remove cards</button><span id="hand-count" class="right small">0 cards</span></div>
+      <div class="rank-grid" id="rank-grid"></div>
+      <div class="hand-list" id="hand-list"><span class="quiet">No cards yet</span></div>
+      <details class="details"><summary>Faster: paste your full hand at once</summary>
+        <label class="field">Card notation (space/comma-separated)<input id="paste-cards" autocomplete="off" spellcheck="false" placeholder="AH 10S 3D 4C 4H 2xKC"></label>
+        <div class="control-row"><button id="replace-hand" class="primary">Replace hand</button><button id="append-hand">Add these cards</button></div>
+        <p>Write rank then suit: A, K, Q, J, 10–2 plus H, D, S, C. Repetitions: <code>2xAH</code>. Use the physical cards in front of you.</p>
+      </details>
+      <div class="inline-setters">
+        <label class="field">Cash, $ <input id="cash" type="number" min="0" step="1" inputmode="numeric"></label>
+        <label class="field">Owned Jokers <input id="jokers" type="number" min="0" step="1" inputmode="numeric"></label>
+      </div>
+      <button id="undo" class="ghost">Undo last recorded action</button>
+      <div class="small quiet" id="undo-label"></div>
+    </section>
+    <div class="stack">
+      <section class="panel">
+        <h2>Price the next card</h2><p>These are exact changes in your current hand's card score. They are not market prices or forecasts of another team's willingness to trade.</p>
+        <div class="split-head"><h3>Top cards to buy</h3><span>Maximum break-even price</span></div>
+        <div class="value-list" id="buy-list"></div>
+        <div class="split-head"><h3>Cards you can sell</h3><span>Minimum break-even price</span></div>
+        <div class="value-list" id="sell-list"></div>
+      </section>
+      <section class="panel">
+        <h2>How the score works</h2>
+        <div id="score-explain"></div>
+        <details class="details"><summary>Exact rules and input guide</summary>
+          <p>A 2–10 is worth 10 base points, J–K 30, and A 50. Treasure suit adds +1×. Trash suit subtracts 1×, except an all-trash hand receives +1× instead. Exactly two of a rank each gain +0.5×; three or more each gain +1×. Jokers choose the single best virtual card, and only one Joker scores. Cash adds one point per dollar.</p>
+          <p>Card entry needs your real hand. Cash and Joker counts must reflect your current holdings. Unknown contracts count only in estimated score, never in confirmed score.</p>
+        </details>
+      </section>
+    </div>
+  </div>
+</section>
+<section class="workspace" id="tab-trade">
+  <div class="twocol">
+    <section class="panel">
+      <h2>Evaluate an entire proposed trade</h2>
+      <p>Enter cards and other assets coming to you or leaving you. The recommendation compares the complete new hand, including the effect on existing cards.</p>
+      <div class="inline-setters">
+        <label class="field">Cards you RECEIVE<input id="trade-receive" spellcheck="false" placeholder="AH 10S"></label>
+        <label class="field">Cards you GIVE<input id="trade-give" spellcheck="false" placeholder="KC 3H"></label>
+        <label class="field">Cash change ($)<input id="trade-cash" type="number" step="1" value="0" inputmode="numeric"><small>+ means cash received. − means you pay.</small></label>
+        <label class="field">Jokers change<input id="trade-jokers" type="number" step="1" value="0" inputmode="numeric"><small>+ receive, − give.</small></label>
+      </div>
+      <details class="details"><summary>Include contracts in this trade</summary>
+        <label class="field">Contract you GIVE<select id="trade-give-contract"><option value="">None</option></select></label>
+        <label class="field">New contract you RECEIVE, name<input id="trade-contract-name" placeholder="e.g. All 4 Aces"></label>
+        <div class="inline-setters">
+          <label class="field">Payout (points)<input id="trade-contract-payout" type="number" min="0" step="1" value="0"></label>
+          <label class="field">Estimated chance (%)<input id="trade-contract-prob" type="number" min="0" max="100" step="1" value="50"></label>
+        </div>
+        <p>Conditions can refer to the entire game. Enter the chance you personally assign, then update the result if it becomes known.</p>
+      </details>
+      <div class="decision" id="trade-result"><strong>Enter an offered trade.</strong></div>
+      <button id="confirm-trade" class="primary" disabled>Record this trade after agreement</button>
+      <button id="clear-trade">Clear proposal</button>
+      <p class="muted">The panel cannot see other players' cards, enforce trades, or submit an offer. Confirm only after the exchange actually occurs.</p>
+    </section>
+    <section class="panel">
+      <h2>Quick negotiation reference</h2>
+      <div id="trade-tips"></div>
+      <h3>Current contracts</h3>
+      <div id="contract-list" class="value-list"></div>
+      <div class="divider"></div>
+      <h3>Add a contract you already own</h3>
+      <label class="field">Title / condition<input id="contract-name" placeholder="e.g. Have at least three Aces"></label>
+      <div class="inline-setters"><label class="field">Payout<input id="contract-payout" type="number" min="0" step="1" value="100"></label>
+      <label class="field">Chance of success, %<input id="contract-prob" type="number" min="0" max="100" step="1" value="50"></label></div>
+      <button id="add-contract">Add to holdings</button>
+    </section>
+  </div>
+</section>
+<section class="workspace" id="tab-auction">
+  <div class="twocol">
+    <section class="panel">
+      <h2>Auction bid calculator</h2>
+      <p>Three highest bids, including tied bidders, buy the item and must pay. The five auctions start at 0:00, 3:00, 6:00, 9:00, and 12:00. Each closes 2:40 later.</p>
+      <div class="inline-setters">
+        <label class="field">Auction number<select id="auction-number"><option value="1">1 (0:00)</option><option value="2">2 (3:00)</option><option value="3">3 (6:00)</option><option value="4">4 (9:00)</option><option value="5">5 (12:00)</option></select></label>
+        <label class="field">Item offered<select id="auction-kind"><option value="joker">Joker</option><option value="contract">Bounty contract</option></select></label>
+      </div>
+      <div id="auction-contract-fields">
+        <label class="field">Contract title / condition<input id="auction-contract-name" placeholder="e.g. Most diamonds at game end"></label>
+        <div class="inline-setters">
+          <label class="field">Contract payout<input id="auction-payout" type="number" min="0" step="1" value="100"></label>
+          <label class="field">Estimated chance, %<input id="auction-prob" type="number" min="0" max="100" step="1" value="50"></label>
+        </div>
+      </div>
+      <label class="field">Downside sensitivity <strong id="downside-value">35%</strong>
+        <input id="downside" type="range" min="0" max="100" value="35"></label>
+      <p class="muted">0% uses expected contract payout. 100% subtracts one estimated standard deviation of the contract's payout. This does not predict winning bids.</p>
+      <div id="auction-result" class="decision"></div>
+      <div class="inline-setters">
+        <label class="field">Actual winning bid you paid ($)<input id="auction-paid" type="number" min="0" step="1" placeholder="Enter only if won"></label>
+        <label class="field">Observed 3rd-place winning bid ($)<input id="auction-cutoff" type="number" min="0" step="1" placeholder="Optional"></label>
+      </div>
+      <div class="control-row"><button id="record-win" class="primary">Record won item and cash paid</button><button id="record-cutoff">Save observed cutoff</button></div>
+      <p class="muted">If you win, pay the bid at the booth no later than the end of the next auction, or risk disqualification. For auction 5, pay after trading ends if needed.</p>
+    </section>
+    <section class="panel">
+      <h2>Observed auction history</h2>
+      <div id="cutoff-list" class="value-list"></div>
+      <h3>Joker economics</h3>
+      <div id="joker-explain"></div>
+      <h3>Bid strategy</h3>
+      <p>Value comes from your actual hand. If you already own a Joker, another Joker adds no scoring value while you keep the first. For a contract, use its printed payout and your estimated probability of satisfying its condition. Do not bid more cash than you own.</p>
+      <p>Winning cutoff observations give a rough indication of rival demand, not a reliable forecast. Teams can change behavior during the round.</p>
+    </section>
+  </div>
+</section>
+<section class="workspace" id="tab-opponents">
+  <div class="twocol">
+    <section class="panel">
+      <h2>Record a rival's offer</h2><p>Learn from actual negotiation behavior. You only need a name, an asset, a price, and whether the offer was accepted.</p>
+      <label class="field">Other team / identifier<input id="opponent-name" placeholder="e.g. Team 17"></label>
+      <div class="inline-setters">
+        <label class="field">Rival wants to<select id="opponent-direction"><option value="buy">BUY this asset from you</option><option value="sell">SELL this asset to you</option></select></label>
+        <label class="field">Asset / card<input id="opponent-asset" placeholder="e.g. AH, Joker, contract"></label>
+        <label class="field">Offered price ($)<input id="opponent-price" type="number" min="0" step="1" value="50"></label>
+        <label class="field">Outcome<select id="opponent-outcome"><option value="offered">Offer only</option><option value="accepted">Accepted</option><option value="rejected">Rejected</option></select></label>
+      </div>
+      <button id="record-offer" class="primary">Record observation</button>
+      <p class="muted">This records an offer. It does not change your holdings. Use Trade calculator to record an actual exchange.</p>
+    </section>
+    <section class="panel">
+      <h2>Opponent counterplay</h2>
+      <label class="field">Focus on a team<select id="opponent-focus"><option value="">Choose a recorded team</option></select></label>
+      <div class="decision" id="opponent-summary">No negotiation evidence yet.</div>
+      <div id="opponent-list" class="value-list"></div>
+      <p class="muted">Bids and asks are observed signals, not proof of a rival's private hand or reservation value. Rejecting an offer may reflect timing, liquidity, or a different strategy.</p>
+    </section>
+  </div>
+</section>
+<div class="status" id="status" role="status"></div>
+</main>
+<footer>All inputs remain in this browser. No game API, authentication, or trading connection. The competition's official clock and booth rules take priority.</footer>
+</div>
+<script type="module" src="./app.js"></script>
+</body></html>

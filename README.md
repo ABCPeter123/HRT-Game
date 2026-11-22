@@ -8,7 +8,7 @@ Independent projects for trading competitions. Each game keeps its own source co
 | Scavenger | [scavenger](scavenger/) | **Live decision panel available** |
 | Baskets | [baskets](baskets/) | **Live decision panel available in GitHub** |
 | Vault | [vault](vault/) | Ready for development |
-| Treasures & Trash | [treasures-and-trash](treasures-and-trash/) | Ready for development |
+| Treasures & Trash | [treasures-and-trash](treasures-and-trash/) | **Live decision panel available in GitHub** |
 | Liar's Market | [liars-market](liars-market/) | **Live decision panel available in GitHub** |
 
 The five Waterloo Quant Club games are from the Fall 2026 Trading Competition packet. AlgoArena is the separate existing HRT project.
@@ -19,7 +19,7 @@ The five Waterloo Quant Club games are from the Fall 2026 Trading Competition pa
 python -m http.server 8000
 ```
 
-Open `http://localhost:8000/` to select a game. Scavenger is at `/scavenger/`; Baskets is at `/baskets/`; Liar's Market is at `/liars-market/`. Each runs without a backend or AI API, and saves observations in the local browser. Run `cd baskets && npm test` or `cd liars-market && npm test` to validate the corresponding panel.
+Open `http://localhost:8000/` to select a game. Scavenger is at `/scavenger/`; Baskets is at `/baskets/`; Liar's Market is at `/liars-market/`; Treasures & Trash is at `/treasures-and-trash/`. Each runs without a backend or AI API, and saves observations in the local browser. Run `cd baskets && npm test`, `cd liars-market && npm test` or `cd treasures-and-trash && npm test` to validate the corresponding panel.
 
 **Production deployments are paused:** Vercel is configured not to deploy Git pushes. The deployed public URL may still serve the earlier Scavenger-only version. Ask explicitly before publishing new changes.
 
