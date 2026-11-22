@@ -7,3 +7,8 @@
 #reset-game{border:1px solid #82515a;color:#f4b5bf;background:transparent;margin-left:auto}
 #reset-game:hover{background:#3a2430}
 @media(max-width:520px){#reset-game{width:100%;margin:8px 0 0}}
+
+/* Persistent access to the step-by-step manual from the live trading screen. */
+a.manual-shortcut{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin:5px 10px 5px 0;padding:7px 10px;border-radius:7px;border:1px solid #327f70;background:#173a35;color:#87ead4;font-size:12px;line-height:1.35;font-weight:750;letter-spacing:0;text-decoration:none;max-width:100%;white-space:normal}
+a.manual-shortcut:hover{background:#26574b;border-color:#72dfc4;color:#f3fffb}
+a.manual-shortcut:focus-visible{outline:2px solid #79e8d0;outline-offset:2px}
