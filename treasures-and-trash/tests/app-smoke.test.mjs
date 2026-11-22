@@ -42,3 +42,24 @@ test('auction win deducts cash and adds one Joker',()=>{
  const round=JSON.parse(storage.get('quant-comp-treasures-v1')).rounds['1'];
  assert.equal(round.cash,470);assert.equal(round.jokers,1);
 });
+
+
+test('card proposal can be built with taps and removed without recording a trade',()=>{
+ const fire=dataset=>elements['trade-picker'].fire('click',{target:{closest:()=>({dataset})}});
+ elements['replace-hand'].fire('click',{target:elements['replace-hand']});
+ elements['trade-receive'].value='';elements['trade-give'].value='';
+ fire({tradeSide:'receive'});
+ fire({tradeSuit:'D'});
+ fire({tradeRank:'14'});
+ assert.equal(elements['trade-receive'].value,'AD');
+ fire({tradeSide:'give'});
+ fire({tradeSuit:'S'});
+ fire({tradeRank:'14'});
+ assert.equal(elements['trade-give'].value,'AS');
+ fire({tradeCash:'-25'});
+ assert.equal(elements['trade-cash'].value,'-25');
+ fire({proposalRemove:'receive:0'});
+ assert.equal(elements['trade-receive'].value,'');
+ const state=JSON.parse(storage.get('quant-comp-treasures-v1')).rounds['1'];
+ assert.ok(state.cards.some(c=>c.rank===14&&c.suit==='S'),'Tap proposal must not execute physical trade');
+});
