@@ -6,6 +6,12 @@ import {
 } from "./engine.js";
 
 const STORAGE_KEY = "quant-comp-scavenger-v1";
+document.getElementById("reset-game").addEventListener("click",()=>{
+  if(!window.confirm("Reset ALL Scavenger data? This permanently erases all five rounds, auction results, guesses, and learned opponent history. This cannot be undone."))return;
+  try{localStorage.removeItem(STORAGE_KEY);}
+  catch{window.alert("Could not clear saved data. Reset cancelled.");return;}
+  window.location.reload();
+});
 const NAMES = ["Info", "Auction 1", "Auction 2", "Auction 3", "Final guess"];
 const WINDOW_SECONDS = [60, 60, 60, 60, 90];
 const $ = (id) => document.getElementById(id);
