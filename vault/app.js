@@ -150,6 +150,12 @@ function syncChipType(){
 }
 function renderChipPad(){
  const kind=$("partial-type").value;
+ $("chip-pad-kinds").innerHTML=[
+   ["unknown","Partial number"],["none","Exact value only"],["combo","Combination"]
+ ].map(([format,label])=>
+   '<button type="button" data-chip-pad-kind="'+format+'" class="'+
+   (kind===format?"selected":"")+'" aria-pressed="'+(kind===format)+'">'+label+'</button>').join("")+
+   '<small>Use the dropdown above for explicitly identified true/error/false chip types.</small>';
  const targets=kind==="combo"?
    [["combo-a","Referenced chip A"],["combo-b","Referenced chip B"],["combo-value","Rounded mean"],["true-value","Exact true value"]]:
    kind==="none"?[["true-value","Exact true value"]]:
@@ -444,6 +450,9 @@ $("partial-type").addEventListener("change",syncChipType);
 
 $("chip-tap-pad").addEventListener("click",event=>{
  const b=event.target.closest("button");if(!b)return;
+ if(b.dataset.chipPadKind){
+   $("partial-type").value=b.dataset.chipPadKind;syncChipType();return;
+ }
  if(b.dataset.chipPadTarget){
    chipPadTarget=b.dataset.chipPadTarget;renderChipPad();return;
  }
