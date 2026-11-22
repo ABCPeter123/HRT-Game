@@ -34,6 +34,7 @@ try{
 let latest=null,lastBest=null,tickHandle=null,timerStart=0,elapsedAtStart=0,lastPenaltyTime=0;
 let bridgeActive=false,bridgeBusy=false,bridgeSeq=-1,bridgeSource="",lastBridgeData=0;
 let capturedPositionSymbols=new Set();
+let chipPadTarget="partial-value";
 function store(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch{}}
 function r(){return state.rounds[state.round-1];}
 function currentRole(){return roleForRound(state.cohort,state.round);}
@@ -145,6 +146,30 @@ function syncChipType(){
  const kind=$("partial-type").value;
  $("combo-wrap").hidden=kind!=="combo";
  $("partial-wrap").hidden=kind==="combo"||kind==="none";
+ renderChipPad();
+}
+function renderChipPad(){
+ const kind=$("partial-type").value;
+ const targets=kind==="combo"?
+   [["combo-a","Referenced chip A"],["combo-b","Referenced chip B"],["combo-value","Rounded mean"],["true-value","Exact true value"]]:
+   kind==="none"?[["true-value","Exact true value"]]:
+   [["partial-value","Displayed partial"],["true-value","Exact true value"]];
+ if(!targets.some(x=>x[0]===chipPadTarget))chipPadTarget=targets[0][0];
+ $("chip-pad-targets").innerHTML=targets.map(([id,label])=>
+   '<button type="button" data-chip-pad-target="'+id+'" class="'+
+   (chipPadTarget===id?"selected":"")+'" aria-pressed="'+(chipPadTarget===id)+'">'+
+   label+'</button>').join("");
+ const max=chipPadTarget==="combo-a"||chipPadTarget==="combo-b"?30:10;
+ const selected=$(chipPadTarget).value;
+ $("chip-pad-values").classList.toggle("long-pad",max===30);
+ $("chip-pad-values").innerHTML=Array.from({length:max},(_,i)=>i+1).map(n=>
+   '<button type="button" data-chip-pad-number="'+n+'" class="'+
+   (selected===String(n)?"selected":"")+'" aria-pressed="'+(selected===String(n))+'">'+n+
+   '</button>').join("")+
+   '<button type="button" class="clear-value" data-chip-pad-number="">Unknown / clear</button>';
+ $("chip-pad-note").textContent=max===30?
+   "Tap the other chip ID from the combination clue. Save after both references and the mean are entered.":
+   "Tap only the observed number. Unknown / clear removes this field; it does not mean zero. Save the chip when ready.";
 }
 function getOptionalInteger(id,min,max){
  const raw=$(id).value.trim();if(!raw)return null;
@@ -169,7 +194,8 @@ function saveChip(){
    if(!validateChip(ch))throw Error("Invalid chip or combination reference. A combo must use two distinct other chip IDs.");
    r().chips[id-1]=ch;store();recompute();
    message("chip-feedback","Chip "+id+" saved. Fair values updated.");
- }catch(e){message("chip-feedback",e.message,true);}
+  return true;
+ }catch(e){message("chip-feedback",e.message,true);return false;}
 }
 function parseBulk(){
  const text=$("bulk-chips").value.trim();
@@ -415,6 +441,23 @@ $("public-chips").addEventListener("click",e=>{const b=e.target.closest("[data-c
 $("private-chips").addEventListener("click",e=>{const b=e.target.closest("[data-chip]");
  if(b&&currentRole()==="taker"){state.selected=Number(b.dataset.chip);renderRevealSummary();renderChipForm();store();}});
 $("partial-type").addEventListener("change",syncChipType);
+
+$("chip-tap-pad").addEventListener("click",event=>{
+ const b=event.target.closest("button");if(!b)return;
+ if(b.dataset.chipPadTarget){
+   chipPadTarget=b.dataset.chipPadTarget;renderChipPad();return;
+ }
+ if(b.dataset.chipPadNumber!==undefined){
+   $(chipPadTarget).value=b.dataset.chipPadNumber;
+   renderChipPad();
+ }
+});
+$("save-next-chip").addEventListener("click",()=>{
+ if(!saveChip())return;
+ state.selected=currentRole()==="maker"?state.selected%20+1:state.selected%30+1;
+ renderRevealSummary();renderChipForm();store();
+});
+
 $("save-chip").addEventListener("click",saveChip);
 $("clear-chip").addEventListener("click",()=>{
  r().chips[state.selected-1]=freshChip(state.selected);store();recompute();message("chip-feedback","Chip cleared.");
