@@ -192,7 +192,7 @@ function parseBulk(){
  }catch(e){message("chip-feedback",e.message,true);}
 }
 function marketInputs(){
- $("market-grid").innerHTML='<div class="market-head"><span>CONTRACT</span><span>BEST BID</span><span>BEST ASK</span><span>BID SIZE</span><span>ASK SIZE</span><span>POSITION</span></div>'+
+ $("market-grid").innerHTML='<div class="market-head"><span>CONTRACT</span><span>BEST BID</span><span>BEST ASK</span><span>BID SIZE</span><span>ASK SIZE</span><span>POSITION</span><span>WORKING BUYS</span><span>WORKING SELLS</span></div>'+
  SYMBOLS.map(sym=>{
   const b=r().books[sym];
   return '<div class="market-row"><strong>'+sym+'</strong>'+[
