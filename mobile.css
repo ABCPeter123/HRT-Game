@@ -1,0 +1,164 @@
+/* Shared phone layout for all five competition panels.
+   Loaded after each game's own stylesheet. Desktop rules stay unchanged. */
+@media (max-width: 767px) {
+  html { -webkit-text-size-adjust: 100%; }
+  body { width: 100%; max-width: 100%; }
+  body [hidden] { display: none !important; }
+  body *, body *::before, body *::after { box-sizing: border-box; }
+  body .shell { width: 100%; max-width: 100%; padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); }
+  body .shell > *, body .panel, body .workspace, body .workflow-view, body .flow-stage,
+  body .left-col, body .right-col, body .play-primary, body .play-secondary,
+  body .input-column, body .decision-column { min-width: 0; max-width: 100%; }
+  body input:not([type="range"]):not([type="checkbox"]), body textarea, body select { font-size: 16px !important; max-width: 100%; }
+  body button, body a, body summary { touch-action: manipulation; }
+  body button, body .button { overflow-wrap: anywhere; }
+  body button:focus-visible, body a:focus-visible { outline-offset: 3px; }
+  body .manual-callout { display: grid !important; grid-template-columns: minmax(0, 1fr) auto; align-items: center !important; gap: 10px; padding: 11px 12px; margin: 10px 0 14px; }
+  body .manual-callout-text p { display: none; }
+  body .manual-callout-text strong { font-size: 11px; letter-spacing: .025em; }
+  body .manual-callout-button { width: auto !important; min-height: 44px; padding: 8px 11px; white-space: normal; text-align: center; font-size: 12px; }
+  body a.manual-shortcut { min-height: 42px; margin: 3px 0; padding: 9px 12px; }
+  body .panel, body .decision-panel { padding: 14px; }
+}
+/* Scavenger: the recommended decision is visible above inputs and phases stay tappable. */
+@media (max-width: 767px) {
+  body.game-scavenger .masthead { height: auto; min-height: 65px; padding: 11px 0; }
+  body.game-scavenger .brandline { flex-wrap: wrap; gap: 7px 12px; }
+  body.game-scavenger .brandline .brand { flex-basis: 100%; order: 3; }
+  body.game-scavenger .topbar { gap: 10px; align-items: stretch; }
+  body.game-scavenger .rounds { flex-wrap: wrap; gap: 8px; }
+  body.game-scavenger .round-button, body.game-scavenger .tiny-button { min-height: 44px; }
+  body.game-scavenger .clock { flex-wrap: wrap; justify-content: space-between; }
+  body.game-scavenger .phase-button { min-height: 54px; padding: 6px 2px; }
+  body.game-scavenger .phase-button .phase-name { font-size: 11px; white-space: normal; overflow-wrap: anywhere; text-align: center; line-height: 1.2; }
+  body.game-scavenger .workspace { grid-template-columns: minmax(0, 1fr); }
+  body.game-scavenger .decision-column { order: -1; }
+  body.game-scavenger .decision-panel { position: static; min-height: 0; }
+  body.game-scavenger .action-label { margin-top: 13px; }
+  body.game-scavenger .action-number { font-size: clamp(46px, 14vw, 70px); overflow-wrap: anywhere; }
+  body.game-scavenger .choice-btn, body.game-scavenger .step-btn { min-height: 44px; }
+  body.game-scavenger .inline-actions > button { flex: 1 1 140px; min-height: 44px; }
+}
+/* Baskets: single-column desk and individually labeled market inputs. */
+@media (max-width: 767px) {
+  body.game-baskets .masthead { height: auto; min-height: 70px; padding: 12px 0; flex-wrap: wrap; }
+  body.game-baskets .brand { flex: 1 1 100%; flex-wrap: wrap; gap: 8px 11px; }
+  body.game-baskets .brand > div:last-child { flex-basis: 100%; }
+  body.game-baskets .brand .logo { display: none; }
+  body.game-baskets .local-status { display: none; }
+  body.game-baskets .toolbar { flex-wrap: wrap; gap: 10px; padding: 10px 0; }
+  body.game-baskets .round-switch, body.game-baskets .timer { flex-wrap: wrap; gap: 8px; }
+  body.game-baskets .round-buttons button, body.game-baskets .timer button { min-height: 44px; }
+  body.game-baskets .workflow-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 5px; }
+  body.game-baskets .workflow-tab { min-height: 52px; min-width: 0; padding: 8px 5px; flex-wrap: wrap; justify-content: center; text-align: center; font-size: 11px; }
+  body.game-baskets .workflow-tab:last-child { grid-column: auto; }
+  body.game-baskets .desk-layout, body.game-baskets .signal-layout, body.game-baskets .main-grid { grid-template-columns: minmax(0, 1fr); }
+  body.game-baskets .desk-live-action { flex-direction: column; gap: 6px; }
+  body.game-baskets .desk-live-side { font-size: clamp(26px, 9vw, 37px); }
+  body.game-baskets .desk-live-details { white-space: normal; text-align: left; align-items: flex-start; }
+  body.game-baskets .desk-primary-actions > button { flex: 1 1 125px; min-height: 46px; }
+  body.game-baskets .quick-header { display: none; }
+  body.game-baskets .quick-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; padding: 11px; }
+  body.game-baskets .quick-symbol { grid-column: 1 / -1; width: 100%; min-height: 44px; font-size: 13px; text-align: left; padding-left: 12px; }
+  body.game-baskets .quick-cell { display: flex; flex-direction: column; min-width: 0; gap: 5px; }
+  body.game-baskets .quick-cell:last-child { grid-column: 1 / -1; }
+  body.game-baskets .quick-cell-label { color: #b7cbd7; font-size: 11px; font-weight: 750; text-transform: uppercase; }
+  body.game-baskets .quick-input { width: 100%; min-height: 46px; text-align: left; font-size: 16px; padding: 8px 11px; }
+  body.game-baskets .desk-call-update { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; gap: 8px; }
+  body.game-baskets .desk-call-update label { min-width: 0; }
+  body.game-baskets .desk-call-update input { min-height: 46px; }
+  body.game-baskets .desk-call-update button { width: 100%; min-height: 44px; }
+  body.game-baskets .quick-status { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  body.game-baskets .quick-status-button { min-height: 52px; }
+  body.game-baskets .quick-pills button { min-height: 44px; }
+  body.game-baskets .indices { grid-template-columns: minmax(0, 1fr); }
+  body.game-baskets .sectionheading { flex-wrap: wrap; gap: 7px; }
+  body.game-baskets .signal-prompt { left: 10px; right: 10px; bottom: max(10px, env(safe-area-inset-bottom)); max-width: none; max-height: 75dvh; overflow-y: auto; }
+}
+/* Vault: each asset becomes a readable market entry card instead of an 8-column table. */
+@media (max-width: 767px) {
+  body.game-vault .top-controls { gap: 8px; }
+  body.game-vault .top-controls > label { flex: 1 1 100%; flex-wrap: wrap; }
+  body.game-vault .top-controls select { flex: 1 1 170px; max-width: 100%; }
+  body.game-vault .rounds { flex: 1 1 auto; }
+  body.game-vault .rounds button { min-height: 44px; }
+  body.game-vault .status-bar { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+  body.game-vault .status-bar > div { min-width: 0; }
+  body.game-vault .status-bar button { width: 100%; min-height: 44px; }
+  body.game-vault .decision-tools button { flex: 1 1 125px; min-height: 44px; }
+  body.game-vault .stage { min-height: 59px; padding: 7px 4px; }
+  body.game-vault .stage small { font-size: 10px; }
+  body.game-vault .market-grid { overflow: visible; }
+  body.game-vault .market-head { display: none; }
+  body.game-vault .market-row { display: grid; min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; padding: 12px; }
+  body.game-vault .market-row > strong { grid-column: 1 / -1; font-size: 15px; }
+  body.game-vault .market-cell { display: flex; flex-direction: column; min-width: 0; gap: 5px; color: #b9d0db; font-size: 11px; font-weight: 700; }
+  body.game-vault .market-cell input { width: 100%; min-height: 45px; text-align: left; padding: 9px; }
+  body.game-vault .chip-fields { grid-template-columns: minmax(0,1fr); }
+  body.game-vault .chip-fields > label:first-child, body.game-vault .chip-fields > .inline, body.game-vault .chip-fields > .hint, body.game-vault .combo-fields { grid-column: 1 / -1; }
+  body.game-vault .chip-tap-pad button { min-height: 44px; }
+  body.game-vault .combo-fields { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.game-vault .combo-fields > label:last-child { grid-column: 1 / -1; }
+  body.game-vault .chip-grid { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  body.game-vault .pad-values.long-pad { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  body.game-vault .reveal-summary, body.game-vault .portfolio-grid { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.game-vault .fair-grid { grid-template-columns: minmax(0,1fr); }
+  body.game-vault .inline > button { flex: 1 1 150px; min-height: 44px; }
+}
+/* Treasures & Trash: no horizontal tab strip; larger trading inputs and card picker. */
+@media (max-width: 767px) {
+  body.game-treasures .masthead .back { margin-bottom: 7px; }
+  body.game-treasures .toolbar { margin: 12px 0; gap: 8px; }
+  body.game-treasures .toolbar button { min-height: 44px; }
+  body.game-treasures .tabs { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; overflow: visible; }
+  body.game-treasures .tab { white-space: normal; min-width: 0; min-height: 48px; padding: 9px 6px; }
+  body.game-treasures .twocol { grid-template-columns: minmax(0,1fr); }
+  body.game-treasures .score-strip { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.game-treasures .rank-grid, body.game-treasures .trade-picker-ranks { grid-template-columns: repeat(5,minmax(0,1fr)); }
+  body.game-treasures .rank-grid button, body.game-treasures .trade-picker-ranks button { min-height: 46px; }
+  body.game-treasures .inline-setters { grid-template-columns: minmax(0,1fr); }
+  body.game-treasures .proposal-picker { padding: 11px; }
+  body.game-treasures #trade-picker-side button { min-width: 0; min-height: 48px; }
+  body.game-treasures #trade-picker-suit { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); }
+  body.game-treasures #trade-picker-suit button { min-width: 0; padding: 6px 2px; }
+  body.game-treasures .trade-money-shortcuts button { min-height: 44px; }
+  body.game-treasures .value-row { flex-wrap: wrap; gap: 8px; overflow-wrap: anywhere; }
+  body.game-treasures .value-row button { min-height: 44px; margin-left: auto; }
+}
+/* Liar's Market: 13 ranks wrap into two rows rather than scrolling sideways. */
+@media (max-width: 767px) {
+  body.game-liars .toolbar { gap: 8px; }
+  body.game-liars .round-switch { display: flex; width: 100%; }
+  body.game-liars .round-switch button { flex: 1; min-height: 44px; }
+  body.game-liars .select-label { flex: 1 1 140px; min-width: 0; }
+  body.game-liars .select-label select { width: auto; flex: 1; min-width: 0; }
+  body.game-liars .flow-steps button { min-height: 55px; gap: 5px; padding: 8px 3px; text-align: center; }
+  body.game-liars .flow-progress { padding: 11px; }
+  body.game-liars .deal-grid, body.game-liars .play-grid, body.game-liars .result-grid { grid-template-columns: minmax(0,1fr); }
+  body.game-liars .deck { overflow: visible; }
+  body.game-liars .suit-row { min-width: 0; display: grid; grid-template-columns: repeat(7,minmax(0,1fr)); gap: 5px; margin-bottom: 8px; }
+  body.game-liars .suit-label { grid-column: 1 / -1; font-size: 13px; line-height: 1.2; }
+  body.game-liars .playing-card { min-width: 0; min-height: 45px; padding: 4px 1px; font-size: 13px; }
+  body.game-liars .type-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+  body.game-liars .type-grid button { min-height: 47px; padding: 7px 3px; font-size: 12px; }
+  body.game-liars .rank-row { display: grid; grid-template-columns: repeat(6,minmax(0,1fr)); gap: 5px; }
+  body.game-liars .rank-row > .mini-label { grid-column: 1 / -1; }
+  body.game-liars .rank-row button { min-width: 0; min-height: 44px; }
+  body.game-liars .scoreboard, body.game-liars .card-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.game-liars .result-shortcuts { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.game-liars .result-shortcuts button, body.game-liars .seat-shortcuts button { min-height: 48px; }
+  body.game-liars .flow-controls button { flex: 1 1 130px; min-height: 44px; }
+  body.game-liars .stage-finish > button { min-height: 47px; }
+}
+@media (max-width: 390px) {
+  body .manual-callout { grid-template-columns: minmax(0,1fr); }
+  body .manual-callout-button { width: 100% !important; }
+  body.game-baskets .quick-report { padding: 10px; }
+  body.game-baskets .desk-call-update { grid-template-columns: minmax(0,1fr); }
+  body.game-vault .status-bar { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.game-liars .suit-row { grid-template-columns: repeat(7,minmax(0,1fr)); gap: 3px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.game-scavenger *, body.game-baskets *, body.game-vault *,
+  body.game-treasures *, body.game-liars * { scroll-behavior: auto !important; }
+}
