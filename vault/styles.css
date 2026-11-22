@@ -33,3 +33,19 @@ a.manual-callout-button{display:inline-flex;align-items:center;justify-content:c
 a.manual-callout-button:hover{background:#bdffe9;color:#04291f!important}
 a.manual-callout-button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 @media(max-width:700px){.manual-callout{flex-direction:column;align-items:stretch;gap:11px;padding:13px}.manual-callout-button{width:100%;text-align:center}}
+
+/* Button entry for revealed chip numbers and combination references. */
+.chip-tap-pad{border:1px solid #44756d;border-radius:10px;padding:13px;margin:12px 0;background:#132e33}
+.pad-intro{display:flex;justify-content:space-between;flex-wrap:wrap;gap:7px;margin-bottom:10px}
+.pad-intro strong{color:#a8ffe6;font-size:12px;letter-spacing:.06em}
+.pad-intro span{color:#c4d7df;font-size:11px}
+.pad-targets{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px}
+.pad-targets button{min-height:42px;background:#1a3841;font-size:12px;padding:9px}
+.pad-targets button.selected{background:#2a816b;border-color:#8df1d8}
+.pad-values{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.pad-values.long-pad{grid-template-columns:repeat(6,minmax(0,1fr))}
+.pad-values button{min-height:40px;padding:9px 0;background:#1b3945}
+.pad-values button.selected{background:#24735f;border-color:#8cffe1}
+.pad-values .clear-value{grid-column:span 2;padding:7px 10px;background:#373842;border-color:#7b6670}
+.chip-tap-pad .hint{margin:9px 0 0}
+@media(max-width:560px){.pad-values.long-pad{grid-template-columns:repeat(5,minmax(0,1fr))}.chip-tap-pad{padding:10px}.pad-targets button{flex:1 1 40%}}
