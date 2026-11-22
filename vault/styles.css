@@ -49,3 +49,7 @@ a.manual-callout-button:focus-visible{outline:3px solid #fff;outline-offset:3px}
 .pad-values .clear-value{grid-column:span 2;padding:7px 10px;background:#373842;border-color:#7b6670}
 .chip-tap-pad .hint{margin:9px 0 0}
 @media(max-width:560px){.pad-values.long-pad{grid-template-columns:repeat(5,minmax(0,1fr))}.chip-tap-pad{padding:10px}.pad-targets button{flex:1 1 40%}}
+
+#chip-pad-kinds{background:#102629;border:1px solid #476b68;border-radius:8px;padding:9px;margin-bottom:11px}
+#chip-pad-kinds button{flex:1 1 110px}
+#chip-pad-kinds small{flex-basis:100%;font-size:11px;color:#b0ceca;line-height:1.5}
