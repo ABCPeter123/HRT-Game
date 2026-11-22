@@ -287,7 +287,7 @@ $("max-games").addEventListener("change",e=>{
 });
 $("my-seat").addEventListener("change",e=>{state.mySeat=Number(e.target.value);renderAll();});
 $("risk").addEventListener("change",e=>{state.risk=Number(e.target.value);store();calculate();});
-$("claimant").addEventListener("change",e=>{game().claimant=Number(e.target.value);store();calculate();});
+$("claimant").addEventListener("change",e=>{game().claimant=Number(e.target.value);store();renderClaimDisplay();calculate();});
   document.getElementById("quick-claimant-seats").addEventListener("click",event=>{
     const b=event.target.closest("[data-quick-claimant]");if(!b)return;
     game().claimant=Number(b.dataset.quickClaimant);
