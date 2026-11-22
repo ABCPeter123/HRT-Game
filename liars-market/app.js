@@ -149,15 +149,19 @@ function calculate(){
   lastEvaluation=evaluation;
   const {reaction:r,claims,top,sim}=evaluation;
   const incomplete=g.hand.length!==handSize(Number(g.scores[state.mySeat])||0)||g.center.length<3;
-  $("reaction-action").textContent=r?r.action:"ENTER CLAIM";
-  $("reaction-action").className="move "+(r?r.action.toLowerCase():"");
+  const ownClaim=Boolean(g.claim&&g.claimant===state.mySeat);
+  $("reaction-action").textContent=ownClaim?"YOUR CLAIM":r?r.action:"ENTER CLAIM";
+  $("reaction-action").className="move "+(ownClaim?"":r?r.action.toLowerCase():"");
   $("probability").textContent=r?"P(exists) "+pct(r.pExists):"";
-  $("reaction-explain").textContent=r?
-    (r.action==="BLUFF"?"Challenge because the hand is unlikely to exist.":
-      r.action==="NUTS"?"Call the claimed hand the highest possible active hand.":
-      "Do not challenge on this model. The next player must make a stronger claim.")+
-      (incomplete?" Card entry is incomplete; do not rely on this probability.":""):
-    "Enter the latest claim to calculate BLUFF / NUTS / PASS. The panel also suggests your next legal claim.";
+  $("reaction-explain").textContent=ownClaim?
+    "You are the claimant. Opponents now have reaction priority; do not challenge your own claim."+
+      (incomplete?" Card entry is incomplete; do not rely on the displayed probability.":""):
+    r?
+      (r.action==="BLUFF"?"Challenge because the hand is unlikely to exist.":
+        r.action==="NUTS"?"Call the claimed hand the highest possible active hand.":
+        "Do not challenge on this model. The next player must make a stronger claim.")+
+        (incomplete?" Card entry is incomplete; do not rely on this probability.":""):
+      "Enter the latest claim to calculate BLUFF / NUTS / PASS. The panel also suggests your next legal claim.";
   $("exist-pct").textContent=r?pct(r.pExists):"—";
   $("nuts-pct").textContent=r?pct(r.pNuts):"—";
   $("bluff-ev").textContent=r?signed(((1-r.pExists)*-payout(g.claim,"bluff-false")+
@@ -311,3 +315,5 @@ window.addEventListener("keydown",e=>{
   if(e.altKey&&e.key.toLowerCase()==="r"){startTimer(10);e.preventDefault();}
 });
 renderAll();paintTimer();
+
+if("serviceWorker" in navigator && location.protocol.startsWith("http"))navigator.serviceWorker.register("../sw.js").catch(()=>{});
