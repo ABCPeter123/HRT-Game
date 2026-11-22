@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0c111b">
+  <meta name="description" content="Scavenger live decision assistant for the Waterloo Quant Club Fall 2026 competition. Fast, local-only auction and guessing recommendations.">
+  <title>Scavenger | Quant Comp 2026</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="masthead">
+      <div class="brandline">
+        <a class="backlink" href="../index.html" aria-label="All games">← All games</a>
+        <div class="brand">
+          <div class="brand-mark">Q</div>
+          <div><div class="eyebrow">WQC 2026 / DECISION DESK</div><h1>Scavenger</h1></div>
+        </div>
+      </div>
+      <div class="statusline"><span class="statusdot"></span> LOCAL ENGINE <span class="middot">·</span> NO SERVER</div>
+    </header>
+
+    <section class="topbar" aria-label="Current round and timer">
+      <div class="rounds">
+        <span class="mini-heading">ROUND</span>
+        <div id="roundButtons" class="round-buttons" role="group" aria-label="Select round"></div>
+      </div>
+      <div class="clock">
+        <div class="clock-left"><span id="timerPhase">INFO WINDOW</span><strong id="timerDisplay">01:00</strong></div>
+        <button id="timerToggle" class="tiny-button" type="button">Start</button>
+        <button id="timerReset" class="tiny-button muted" type="button">Reset</button>
+      </div>
+    </section>
+
+    <nav id="phases" class="phases" aria-label="Game phases"></nav>
+
+    <main class="workspace">
+      <div class="input-column">
+        <section class="panel" aria-labelledby="inputHeading">
+          <div class="panel-top">
+            <div><div class="eyebrow">LIVE INPUT</div><h2 id="inputHeading">Information stage</h2></div>
+            <span id="phaseTag" class="phase-tag">01 / 05</span>
+          </div>
+          <div id="inputFields"></div>
+        </section>
+        <section class="panel secondary-panel" aria-labelledby="roundHeading">
+          <div class="panel-top compact"><div><div class="eyebrow">ROUND JOURNAL</div><h2 id="roundHeading">Your progress</h2></div></div>
+          <div id="journal"></div>
+        </section>
+      </div>
+
+      <aside class="decision-column">
+        <section id="decisionPanel" class="decision-panel" aria-live="polite" aria-atomic="false">
+          <div class="decision-head"><span class="eyebrow">RECOMMENDED ACTION</span><span class="chip" id="confidenceChip">MODEL-BASED</span></div>
+          <div class="action-label" id="actionLabel">Buy samples</div>
+          <div class="action-number" id="actionNumber">3</div>
+          <div class="action-sub" id="actionSub">Initial information recommendation</div>
+          <div class="action-buttons">
+            <button id="useSuggestion" class="button primary" type="button">Use recommendation</button>
+            <button id="copySuggestion" class="button ghost" type="button">Copy</button>
+          </div>
+          <div class="divider"></div>
+          <div id="metrics"></div>
+          <p class="model-note" id="modelNote"></p>
+        </section>
+        <section class="panel info-panel" aria-labelledby="quickHeading">
+          <div class="eyebrow">SCORING RULE</div><h2 id="quickHeading">What matters</h2>
+          <div id="ruleReminder" class="rule-text"></div>
+        </section>
+      </aside>
+    </main>
+
+    <footer class="site-footer">
+      <div>LOCAL MODE <span class="middot">·</span> DATA SAVED ONLY ON THIS DEVICE</div>
+      <div><a href="./README.md" target="_blank" rel="noopener">Strategy & limitations</a></div>
+    </footer>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

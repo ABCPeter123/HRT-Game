@@ -1,0 +1,31 @@
+name: Scavenger decision engine
+
+on:
+  pull_request:
+    paths:
+      - 'scavenger/**'
+      - '.github/workflows/scavenger-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scavenger/**'
+      - '.github/workflows/scavenger-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: scavenger
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check engine.js
+      - run: node --check app.js
+      - run: npm test
