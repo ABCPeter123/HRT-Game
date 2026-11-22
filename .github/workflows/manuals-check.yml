@@ -6,6 +6,7 @@ on:
     paths:
       - 'index.html'
       - 'manual.css'
+      - 'mobile.css'
       - 'sw.js'
       - 'scavenger/manual.html'
       - 'baskets/manual.html'
@@ -19,11 +20,13 @@ on:
       - 'liars-market/index.html'
       - 'scripts/build-site.mjs'
       - 'scripts/check-manuals.mjs'
+      - 'scripts/check-mobile.mjs'
       - '.github/workflows/manuals-check.yml'
   pull_request:
     paths:
       - 'index.html'
       - 'manual.css'
+      - 'mobile.css'
       - 'sw.js'
       - 'scavenger/**'
       - 'baskets/**'
@@ -32,6 +35,7 @@ on:
       - 'liars-market/**'
       - 'scripts/build-site.mjs'
       - 'scripts/check-manuals.mjs'
+      - 'scripts/check-mobile.mjs'
       - '.github/workflows/manuals-check.yml'
   workflow_dispatch:
 
@@ -51,3 +55,4 @@ jobs:
       - run: node --check scripts/check-manuals.mjs
       - run: node scripts/build-site.mjs
       - run: node scripts/check-manuals.mjs
+      - run: node --test scripts/check-mobile.mjs
