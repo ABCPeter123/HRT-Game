@@ -1,8 +1,9 @@
 /* Static panel cache: only small, public UI assets. Never caches user inputs. */
-const CACHE = "quant-comp-panels-2026-v14";
+const CACHE = "quant-comp-panels-2026-v15";
 const ASSETS = [
   "./index.html",
   "./manual.css",
+  "./mobile.css",
   "./scavenger/index.html",
   "./scavenger/manual.html",
   "./scavenger/styles.css",
