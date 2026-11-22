@@ -1,3 +1,6 @@
+/* Desktop grid keeps existing columns while mobile switches to labeled cards. */
+body.game-baskets .quick-cell, body.game-vault .market-cell { display: contents; }
+body.game-baskets .quick-cell-label, body.game-vault .market-cell > span { display: none; }
 /* Shared phone layout for all five competition panels.
    Loaded after each game's own stylesheet. Desktop rules stay unchanged. */
 @media (max-width: 767px) {
@@ -93,6 +96,7 @@
   body.game-vault .market-row { display: grid; min-width: 0; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 9px; padding: 12px; }
   body.game-vault .market-row > strong { grid-column: 1 / -1; font-size: 15px; }
   body.game-vault .market-cell { display: flex; flex-direction: column; min-width: 0; gap: 5px; color: #b9d0db; font-size: 11px; font-weight: 700; }
+  body.game-vault .market-cell > span { display: block; }
   body.game-vault .market-cell input { width: 100%; min-height: 45px; text-align: left; padding: 9px; }
   body.game-vault .chip-fields { grid-template-columns: minmax(0,1fr); }
   body.game-vault .chip-fields > label:first-child, body.game-vault .chip-fields > .inline, body.game-vault .chip-fields > .hint, body.game-vault .combo-fields { grid-column: 1 / -1; }
@@ -161,4 +165,20 @@
 @media (prefers-reduced-motion: reduce) {
   body.game-scavenger *, body.game-baskets *, body.game-vault *,
   body.game-treasures *, body.game-liars * { scroll-behavior: auto !important; }
+}
+
+
+@media (max-width: 767px) {
+  body.competition-home .wrap { padding: 16px max(12px,env(safe-area-inset-left)) 36px max(12px,env(safe-area-inset-right)); }
+  body.competition-home header { padding-bottom: 19px; margin-bottom: 18px; }
+  body.competition-home h1 { font-size: clamp(29px,9vw,39px); }
+  body.competition-home .grid { grid-template-columns: minmax(0,1fr); gap: 10px; }
+  body.competition-home .card { min-height: 0; padding: 17px; }
+  body.competition-home .home-manual-cta { width: 100%; min-width: 0; }
+  body.competition-home .manual-links { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  body.competition-home .manual-links a { min-height: 70px; }
+  body.competition-home button { min-height: 44px; }
+}
+@media (max-width: 390px) {
+  body.competition-home .manual-links { grid-template-columns: minmax(0,1fr); }
 }
