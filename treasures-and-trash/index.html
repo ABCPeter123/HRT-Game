@@ -89,6 +89,23 @@
     <section class="panel">
       <h2>Evaluate an entire proposed trade</h2>
       <p>Enter cards and other assets coming to you or leaving you. The recommendation compares the complete new hand, including the effect on existing cards.</p>
+      <div class="proposal-picker" id="trade-picker" aria-label="Build card trade with buttons">
+        <div class="picker-head"><strong>TAP CARDS INSTEAD OF TYPING CODES</strong><span>Changes the proposed trade only</span></div>
+        <div class="control-row" id="trade-picker-side" role="group" aria-label="Choose trade direction"></div>
+        <div class="control-row" id="trade-picker-suit" role="group" aria-label="Select card suit"></div>
+        <div id="trade-picker-ranks" class="trade-picker-ranks" role="group" aria-label="Select card rank"></div>
+        <div id="trade-picker-summary" class="trade-picker-summary" aria-live="polite"></div>
+        <div class="control-row trade-money-shortcuts">
+          <span>Cash shortcuts:</span>
+          <button type="button" data-trade-cash="-10">Pay $10</button>
+          <button type="button" data-trade-cash="-25">Pay $25</button>
+          <button type="button" data-trade-cash="-50">Pay $50</button>
+          <button type="button" data-trade-cash="10">Get $10</button>
+          <button type="button" data-trade-cash="25">Get $25</button>
+          <button type="button" data-trade-cash="50">Get $50</button>
+        </div>
+        <p class="muted">Tap RECEIVE or GIVE, choose a suit, then tap a rank. Buttons fill the exact trade fields below. You can also remove a selected card with ×. No physical trade is recorded until you confirm the exchange.</p>
+      </div>
       <div class="inline-setters">
         <label class="field">Cards you RECEIVE<input id="trade-receive" spellcheck="false" placeholder="AH 10S"></label>
         <label class="field">Cards you GIVE<input id="trade-give" spellcheck="false" placeholder="KC 3H"></label>
