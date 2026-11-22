@@ -15,6 +15,7 @@ const css=read("manual.css");
 assert.match(css,/@media print/,"Manuals must be printable");
 assert.match(css,/@media\(max-width:840px\)/,"Manuals need a mobile breakpoint");
 assert.ok(homepage.includes("Step-by-step game manuals"),"Homepage manual directory missing");
+assert.ok(homepage.includes('class="home-manual-cta"'),"Homepage manual launcher is missing");
 assert.ok(build.includes('"manual.css"'),"Printable styling not bundled");
 assert.ok(sw.includes('"./manual.css"'),"Manual styling not cached");
 for(let i=0;i<names.length;i++){
@@ -27,6 +28,9 @@ for(let i=0;i<names.length;i++){
  assert.match(manual,/href="\.\/"/);
  assert.match(manual,/href="\.\/README\.md"/);
  assert.ok(app.includes('href="./manual.html"'),name+": live panel lacks manual shortcut");
+ assert.ok(app.includes('class="manual-callout"'),name+": no prominent manual launcher");
+ assert.ok(app.includes('class="manual-callout-button"'),name+": no manual action button");
+ assert.ok(styles.includes('.manual-callout{'),name+": manual banner lacks styles");
  assert.match(styles,/\.manual-shortcut/);
  assert.ok(homepage.includes('href="./'+manualPath+'"'),name+": no homepage manual link");
  assert.ok(build.includes('"'+manualPath+'"'),name+": manual excluded from static build");
