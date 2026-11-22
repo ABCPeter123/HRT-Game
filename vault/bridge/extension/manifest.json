@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Vault Local Market Reader",
-  "version": "0.1.0",
-  "description": "Read-only Vault quote mapper with verified numeric fields and localhost-only relay.",
+  "version": "0.2.0",
+  "description": "Read-only Vault reader: symbol-locked dynamic extraction, ambiguous-value checks, localhost-only relay.",
   "permissions": [
     "activeTab",
     "scripting",
