@@ -1,5 +1,5 @@
 /* Static panel cache: only small, public UI assets. Never caches user inputs. */
-const CACHE = "quant-comp-panels-2026-v7";
+const CACHE = "quant-comp-panels-2026-v8";
 const ASSETS = [
   "./index.html",
   "./scavenger/index.html",
@@ -11,6 +11,8 @@ const ASSETS = [
   "./baskets/app.js",
   "./baskets/engine.js",
   "./baskets/import.js",
+  "./baskets/desk-engine.js",
+  "./baskets/desk-ui.js",
   "./liars-market/index.html",
   "./liars-market/styles.css",
   "./liars-market/app.js",

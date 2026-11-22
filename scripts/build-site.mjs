@@ -16,6 +16,8 @@ const required=[
   "baskets/app.js",
   "baskets/engine.js",
   "baskets/import.js",
+  "baskets/desk-engine.js",
+  "baskets/desk-ui.js",
   "baskets/styles.css",
   "baskets/README.md",
   "liars-market/index.html",

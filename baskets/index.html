@@ -23,6 +23,70 @@
     <div class="timer"><div><span>REMAINING</span><strong id="timerValue">10:00</strong></div><button id="timerButton" class="button small">Start</button><button id="timerReset" class="button small ghost">Reset</button></div>
     <button id="reset-game" type="button" class="button small ghost" title="Erase all three Baskets rounds, observations and fills">Reset entire game</button>
   </section>
+
+  <nav class="workflow-tabs" aria-label="Baskets workspace">
+    <button type="button" class="workflow-tab active" data-workflow-tab="desk" aria-selected="true">Execution desk <span id="deskCounter" class="tab-count">0</span></button>
+    <button type="button" class="workflow-tab" data-workflow-tab="signals" aria-selected="false">Price alerts <span id="signalCounter" class="tab-count">0</span></button>
+    <button type="button" class="workflow-tab" data-workflow-tab="analysis" aria-selected="false">Market analysis / setup</button>
+  </nav>
+  <section id="deskView" class="workflow-view" aria-label="Execution desk">
+    <div class="desk-layout">
+      <section class="panel desk-main">
+        <div class="sectionheading"><div><span class="eyebrow">YOUR LIVE CALL</span><h2>Tell your teammate what to execute</h2></div><span id="deskFeedStatus" class="smalltag">MANUAL / LOCAL</span></div>
+        <div id="deskLiveRecommendation" aria-live="polite"></div>
+        <div class="desk-primary-actions">
+          <button type="button" id="callTeammate" class="button primary">Copy instruction + queue call</button>
+          <button type="button" id="openAnalysis" class="button secondary">Update market inputs</button>
+        </div>
+        <p class="hint desk-disclaimer">Copy the call into your team chat or read it aloud. Queuing does not place an exchange order or prove your teammate received the message. Quotes and modeled opportunities can change after a call.</p>
+        <div id="copyFallback" class="copy-fallback" hidden>
+          <label for="copyFallbackText">Select and copy this instruction manually</label>
+          <textarea id="copyFallbackText" readonly rows="3"></textarea>
+        </div>
+      </section>
+      <section class="panel desk-check">
+        <div class="sectionheading"><div><span class="eyebrow">TEAMMATE REPORT</span><h2>Record execution status</h2></div><span id="ordersActiveCount" class="smalltag">0 ACTIVE</span></div>
+        <p class="hint">Have your teammate reply with the call ID. Example: <strong>R1-001 WORKING</strong>, then <strong>R1-001 PARTIAL 8 @ 400.50</strong> and <strong>R1-001 FILLED 20 @ 400.50</strong>. Quantities are cumulative.</p>
+        <label for="teammateReply" class="desk-label">Paste or enter teammate's reply</label>
+        <textarea id="teammateReply" class="desk-textarea" rows="3" spellcheck="false" placeholder="R1-001 PARTIAL 8 @ 400.50"></textarea>
+        <div class="desk-primary-actions">
+          <button id="applyTeammateReply" class="button secondary" type="button">Apply teammate report</button>
+          <button id="pasteTeammateReply" class="button ghost" type="button">Paste from clipboard</button>
+        </div>
+        <div id="deskExecutionNotice" class="hint">Local reports adjust modeled inventory and working orders only when those fields are not already synchronized from the game.</div>
+      </section>
+    </div>
+    <section class="panel desk-orders">
+      <div class="sectionheading"><div><span class="eyebrow">OPEN CALLS AND EXECUTIONS</span><h2>Teammate handoff queue</h2></div><span id="callHistoryCount" class="smalltag">0 CALLS</span></div>
+      <div id="deskCallList"></div>
+    </section>
+  </section>
+  <section id="signalsView" class="workflow-view" hidden aria-label="Price alerts and confirmation">
+    <div class="signal-layout">
+      <section class="panel">
+        <div class="sectionheading"><div><span class="eyebrow">UNEXPLAINED REPRICING</span><h2>Directional movement alerts</h2></div><span id="signalPendingLabel" class="smalltag">0 TO REVIEW</span></div>
+        <p class="hint">A sharp price change can be caused by a bot, customer trades, or other players. A detected move is a prompt for investigation, not evidence of event-bot volume. Review it before any event-flow adjustment.</p>
+        <div class="signal-options">
+          <label for="alertTicks">Alert after midpoint moves</label>
+          <select id="alertTicks">
+            <option value="2">$1.00 (2 ticks)</option>
+            <option value="3">$1.50 (3 ticks)</option>
+            <option value="4">$2.00 (4 ticks)</option>
+            <option value="6">$3.00 (6 ticks)</option>
+          </select>
+          <span class="hint">Measured over up to 20 seconds. Repeated alerts per basket have an 8-second cooldown.</span>
+        </div>
+        <div id="signalHistory" class="signal-history"></div>
+      </section>
+      <section class="panel">
+        <div class="sectionheading"><div><span class="eyebrow">HUMAN-IN-THE-LOOP</span><h2>Confirm what happened</h2></div></div>
+        <div id="signalInspector">
+          <p class="hint">Select a pending price alert to classify the movement and optionally log observed signed trade volume.</p>
+        </div>
+      </section>
+    </div>
+  </section>
+  <div id="analysisView" class="workflow-view" hidden>
   <section class="indexstrip panel" aria-labelledby="indexTitle">
     <div class="sectionheading"><div><span class="eyebrow">MODELLED SETTLEMENT</span><h2 id="indexTitle">Index values</h2></div><span class="muted" id="flowConfidenceTag">UNCERTAIN FLOW</span></div>
     <div id="indexValues" class="indices"></div>
@@ -162,7 +226,20 @@ SAFE 401.0 402.0 90 85 40</code>
       </section>
     </aside>
   </main>
+  </div>
   <footer>WQC GAME 02 <span>·</span> Quick manual entry and optional read-only local capture. No order submission or Vercel deployment.</footer>
+</div>
+
+<div id="signalPrompt" class="signal-prompt" role="alertdialog" aria-labelledby="signalPromptTitle" aria-describedby="signalPromptDetails" hidden>
+  <div class="signal-prompt-header">
+    <div><span class="eyebrow">PRICE CHANGE DETECTED</span><h2 id="signalPromptTitle">Review directional move</h2></div>
+    <button id="deferSignal" type="button" class="button ghost small" aria-label="Review this signal later">Later</button>
+  </div>
+  <div id="signalPromptDetails" class="signal-prompt-details">A basket midpoint has moved quickly.</div>
+  <div class="signal-prompt-actions">
+    <button type="button" id="reviewSignalNow" class="button primary">Review and classify</button>
+  </div>
+  <p class="hint">No flow is added until you confirm observed trade volume.</p>
 </div>
 <div id="toast" class="toast" role="status"></div>
 <script type="module" src="./app.js"></script>

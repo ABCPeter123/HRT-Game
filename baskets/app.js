@@ -4,6 +4,8 @@ import {
   recommend,applyFill,projectedPnl,signed
 } from "./engine.js";
 import {parseMarketText,mergeMarketSnapshot} from "./import.js";
+import {emptyDesk} from "./desk-engine.js";
+import {createDeskUI} from "./desk-ui.js";
 
 const $=id=>document.getElementById(id);
 const KEY="quant-comp-baskets-v1";
@@ -34,7 +36,8 @@ const pct=x=>fmt(x*100,0)+"%";
 const defaultState=()=>({
   version:1,round:0,selected:"GRID",flowMode:"suspected",
   trust:0.35,risk:0.35,maxOrder:100,fillSide:"BUY",
-  rounds:[emptyRound(),emptyRound(),emptyRound()]
+  workspaceTab:"desk",alertTicks:3,
+  rounds:Array.from({length:3},()=>({...emptyRound(),desk:emptyDesk()}))
 });
 function load(){
   let raw;
@@ -48,6 +51,8 @@ function load(){
   clean.risk=clamp(finite(raw.risk,0.35),0,1);
   clean.maxOrder=clamp(Math.round(finite(raw.maxOrder,100)),1,1000);
   clean.fillSide=raw.fillSide==="SELL"?"SELL":"BUY";
+  clean.workspaceTab=["desk","signals","analysis"].includes(raw.workspaceTab)?raw.workspaceTab:"desk";
+  clean.alertTicks=[2,3,4,6].includes(raw.alertTicks)?raw.alertTicks:3;
   clean.rounds=Array.from({length:3},(_,i)=>{
     const item=raw.rounds[i]||{},fresh=emptyRound();
     fresh.clock=clamp(finite(item.clock,600),0,600);
@@ -62,13 +67,20 @@ function load(){
     fresh.events=Array.isArray(item.events)?item.events.slice(-150).filter(x=>SYMBOLS.includes(x.sym)&&["confirmed","suspected","tape"].includes(x.mode)&&Number.isFinite(x.delta)):[];
     fresh.fills=Array.isArray(item.fills)?item.fills.slice(-200):[];
     fresh.snapshots=Array.isArray(item.snapshots)?item.snapshots.slice(-50):[];
+    const older=item.desk&&typeof item.desk==="object"?item.desk:{};
+    fresh.desk={...emptyDesk(),
+      calls:Array.isArray(older.calls)?older.calls.slice(-70).filter(c=>c&&SYMBOLS.includes(c.symbol)&&["BUY","SELL"].includes(c.side)&&typeof c.id==="string"):[],
+      alerts:Array.isArray(older.alerts)?older.alerts.slice(-60).filter(a=>a&&SYMBOLS.includes(a.symbol)&&typeof a.id==="string"):[],
+      nextCall:Number.isSafeInteger(older.nextCall)&&older.nextCall>0?older.nextCall:1,
+      nextAlert:Number.isSafeInteger(older.nextAlert)&&older.nextAlert>0?older.nextAlert:1
+    };
     return fresh;
   });
   return clean;
 }
 let state=load(),deadline=null,toaster,liveDecision=null,lastComputeTime=0;
 let bridgeActive=false,bridgeBusy=false,bridgeSequence=-1;
-let capturePositionSymbols=new Set();
+let capturePositionSymbols=new Set(),captureOrderSymbols=new Set();
 const round=()=>state.rounds[state.round];
 const book=()=>round().books[state.selected];
 const flow=()=>round().flow[state.selected];
@@ -90,7 +102,8 @@ function timerRender(){
 function chooseRound(index){
   elapsed();deadline=null;
   state.round=clamp(index,0,2);state.selected="GRID";
-  bridgeSequence=-1;capturePositionSymbols.clear();
+  bridgeSequence=-1;capturePositionSymbols.clear();captureOrderSymbols.clear();
+  deskUi.resetWatch();
   save();renderAll();
 }
 function toggleTimer(){
@@ -246,7 +259,8 @@ function renderFills(){
     '<div class="fill-list">'+f.slice(-4).reverse().map((entry,index)=>
       '<div class="fill-item"><span><strong>'+escape(entry.side+" "+entry.sym)+'</strong> '+fmt(entry.qty)+
       ' @ '+money(entry.price)+'</span>'+
-      (index===0?'<button id="undoFill" type="button">Undo last</button>':'')+
+      (index===0&&!entry.viaDesk?'<button id="undoFill" type="button">Undo last</button>':'')+
+      (entry.viaDesk?'<span class="hint">Teammate report '+escape(entry.orderId)+'</span>':'')+
       '</div>').join("")+'</div>';
 }
 
@@ -303,6 +317,8 @@ function applyMarketData(snapshot,source){
   if(source==="bridge"){
     for(const sym of SYMBOLS){
       if(snapshot.books?.[sym]?.position!==undefined)capturePositionSymbols.add(sym);
+      if(snapshot.books?.[sym]?.openBuys!==undefined||
+        snapshot.books?.[sym]?.openSells!==undefined)captureOrderSymbols.add(sym);
     }
   }
   const updated=mergeMarketSnapshot(round().books,snapshot);
@@ -311,6 +327,7 @@ function applyMarketData(snapshot,source){
     for(const sym of updated.updatedSymbols)capturePositionSymbols.delete(sym);
   }
   round().books=updated.books;save();
+  deskUi.onQuoteUpdate(updated.updatedSymbols);
   syncMarketInputs();renderDynamic();
   return updated;
 }
@@ -381,7 +398,7 @@ function connectBridge(){
   pollBridge();
 }
 function disconnectBridge(){
-  bridgeActive=false;capturePositionSymbols.clear();bridgeSequence=-1;
+  bridgeActive=false;capturePositionSymbols.clear();captureOrderSymbols.clear();bridgeSequence=-1;
   $("connectBridge").disabled=false;$("disconnectBridge").disabled=true;
   updateBridgeUI("NOT CONNECTED","Capture stopped. Manual quick-entry controls still work.");
 }
@@ -393,12 +410,14 @@ function renderAll(){
   $("sizePresets").innerHTML=[10,25,50,100,200].map(n=>
     '<button type="button" data-size="'+n+'" class="'+(state.maxOrder===n?'selected':'')+'">'+n+'</button>').join("");
   renderFlow();renderFills();renderDynamic();timerRender();
+  deskUi.renderAll();
 }
 function renderDynamic(){
   const d=recommend({books:round().books,flow:round().flow,trust:state.trust,
     risk:state.risk,seconds:round().clock,maxOrder:state.maxOrder,observations:round().snapshots});
   renderSymbols(d);renderIndices(d.fair,round().books);renderBooks(d);
   renderDecision(d);renderTactics(d);renderPortfolio(d);
+  deskUi.renderRecommendation(d);
   syncMarketInputs();
   lastComputeTime=Date.now();
 }
@@ -425,7 +444,7 @@ function captureSnapshot(quiet=false){
   }
   list.push({sym:state.selected,mid:quote.mid,spread:quote.spread,at:Date.now()});
   round().snapshots=list.slice(-50);
-  save();renderDynamic();
+  save();deskUi.onQuoteUpdate([state.selected]);renderDynamic();
   if(!quiet)toast("Price snapshot saved for opponent analysis.");
 }
 function setSelected(sym){
@@ -455,10 +474,34 @@ function recordFill(){
   }catch(error){toast(error.message);}
 }
 function undoFill(){
-  const row=round().fills.pop();if(!row)return;
+  const row=round().fills.at(-1);if(!row)return;
+  if(row.viaDesk){toast("Teammate fills are linked to a call. Do not undo them in the manual journal.");return;}
+  round().fills.pop();
   round().books[row.sym]=row.previous;
-  save();fields();renderFills();renderDynamic();toast("Latest fill entry reverted.");
+  save();fields();renderFills();renderDynamic();toast("Latest manual fill entry reverted.");
 }
+
+function deskFlowLog(sym,mode,delta,alertId){
+  if(!SYMBOLS.includes(sym)||!["confirmed","suspected","tape"].includes(mode)||
+    !Number.isInteger(delta)||delta===0)return;
+  round().flow[sym][mode]=finite(round().flow[sym][mode])+delta;
+  round().events.push({sym,mode,delta,alertId,at:Date.now()});
+  round().events=round().events.slice(-150);
+  save();renderFlow();renderDynamic();
+}
+function refreshAfterDeskReport(){
+  fields();renderFills();renderDynamic();
+}
+const deskUi=createDeskUI({
+  getState:()=>state,getRound:()=>round(),getDecision:()=>liveDecision,
+  getCapture:()=>({
+    active:bridgeActive,
+    positions:capturePositionSymbols,
+    orders:captureOrderSymbols
+  }),
+  save,refresh:refreshAfterDeskReport,onFlow:deskFlowLog,toast
+});
+
 function updateSetting(name,value){
   if(name==="trust")state.trust=clamp(finite(value)/100,0,1);
   else if(name==="risk")state.risk=clamp(finite(value)/100,0,1);
@@ -502,8 +545,9 @@ document.addEventListener("change",event=>{
     const b=round().books[sym];const q=validateBook(b);
     if(q.valid && !round().snapshots.some(x=>x.sym===sym&&x.mid===q.mid)){
       round().snapshots.push({sym,mid:q.mid,spread:q.spread,at:Date.now()});
-      round().snapshots=round().snapshots.slice(-50);save();renderDynamic();
+      round().snapshots=round().snapshots.slice(-50);save();
     }
+    deskUi.onQuoteUpdate([sym]);renderDynamic();
   }
   if(el.dataset.setting==="maxOrder"){
     $("maxOrder").value=state.maxOrder;

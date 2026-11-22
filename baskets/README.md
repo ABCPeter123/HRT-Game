@@ -21,6 +21,37 @@ npm test
 
 The site build includes these files as a separate panel, but **automatic Vercel deployments are paused** by the project settings and root \`vercel.json\`. No deployment is needed to use this updated code locally.
 
+## Execution Desk: two-person trading workflow
+
+The Baskets page now opens on the **Execution desk** tab by default. The three main tabs are **Execution desk**, **Price alerts**, and **Market analysis / setup**. The analysis tab retains the full existing market input, event-flow, orderbook, fill journal, settings and portfolio views.
+
+The execution desk separates four actions that must not be confused:
+
+1. **Recommend:** The large live action shows the current candidate side, basket, limit price, and shares. It can say HOLD, which means no qualified trade. Modeled opportunities can change as quotes or event observations change.
+2. **Call:** Click **Copy instruction + queue call**. This creates a local reference such as \`R1-001\` and copies the exact limit-order instruction with a reply format. Send that copied text to your teammate through the communications channel you already use or read it aloud. A queued call is **not an order** and is **not proof that your teammate received it**. Identical unresolved calls cannot be queued again accidentally.
+3. **Teammate executes and reports:** The teammate submits the actual order in the game, then replies using the reference ID, e.g. \`R1-001 WORKING\`, \`R1-001 PARTIAL 8 @ 399.50\`, or \`R1-001 FILLED 20 @ 399.50\`. \`ACK\`, \`CANCELLED\`, and \`REJECTED\` are also supported, and \`PLACED\` is an alias for WORKING.
+4. **Record:** Paste the teammate's status into the desk and click **Apply teammate report**, or use the one-tap status buttons on that call. For partial and full fills, enter the **cumulative number of filled shares** and the **actual cumulative average fill price**. The engine uses only the change since the previous report. Repeated reports therefore do not double-count an execution.
+
+All recorded calls, statuses and alerts are saved by competition round in browser localStorage. The active-call counter helps you track orders awaiting a reply. The teammate does not automatically receive a message, and there is no real-time shared multi-device database. Exchange order placement and teammate communications take place outside the app.
+
+**Inventory accounting:** When a WORKING order is manually confirmed, its unfilled shares enter the appropriate open-buy/open-sell total. Partial fills reduce the outstanding shares and adjust filled position and cash. Cancellation or rejection releases the remaining reservation. The app enforces the exchange's worst-case ±1,000 per-basket capacity when accepting a status. If the browser extension is already reading live position and open-order totals, those mapped values take priority, and manual execution reports do not add the same fill or order a second time. An imported position without a complete transaction ledger cannot produce trustworthy historical PnL. Do not also enter these same orders independently in the manual working-order fields, or you can count them twice.
+
+**Important:** A pasted \`FILLED\` report is a teammate's statement, not an independent exchange confirmation. Check the reported shares and price against the actual game before using it. The full-fill report must equal the requested quantity. Use PARTIAL when only part of the order executed. The legacy manual fill journal remains available in Market analysis / setup.
+
+### Price-alert review and event confirmation
+
+The **Price alerts** tab monitors changes in *valid quoted basket midpoints*. It supports both manual quote changes and the optional Chrome read-only capture feed. A new valid book establishes a starting reference. When the midpoint moves at least the configured threshold (default **$1.50**, three price ticks) within **20 seconds**, an in-app pop-up asks for review. There is an **8-second cooldown per basket** to avoid excessive notifications. You can choose $1.00, $1.50, $2.00 or $3.00 thresholds. The alert list retains previously reviewed and dismissed observations.
+
+- **Review and classify:** Opens a focused panel showing basket, move direction, previous midpoint, current midpoint and elapsed time.
+- **Suspected event:** Only after you explicitly enter the signed executed volume you actually observed. The existing suspected-event confidence setting discounts it when estimating theoretical settlement.
+- **Confirmed event:** Only when you can reliably identify the event bot and know the executed volume. Adds the exact signed event volume to the official settlement formula.
+- **Ordinary public tape:** Adds user-observed trade volume as public tape. It never affects theoretical settlement.
+- **Reviewed, no volume evidence / Dismiss:** Records the alert without modifying event volume.
+
+**Price movement by itself is not event-bot flow.** The app never converts a $1.50 repricing into an invented number of event-bot shares, nor automatically adjusts settlement from the price delta. Buy- and sell-initiated volume must be confirmed by the user independently of the price direction. Your classification can also disagree with the price direction. Multiple alerts may be queued for review; the in-app pop-up offers **Review and classify** or **Later**.
+
+Alerting only runs while the local panel/browser capture is operating. Background-tab scheduling can be throttled by the browser, so it is an in-app assistance tool, not a guaranteed always-on push notification service or a verified event-bot detector. If live capture omits a basket, the model retains its last entered quote, which might be stale. A new game round resets the intraround price-watch baseline to avoid treating prices from a previous round as a sudden new event.
+
 ## Faster entry and optional automatic reading
 
 The Baskets panel now has **three complementary input modes**. All three update the same local fair-value engine and keep data saved in your browser.
