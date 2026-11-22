@@ -80,12 +80,19 @@
     </label>
     <button id="apply-quick">Apply</button>
   </div>
-  <details class="compact-details"><summary>Tap to build a claim instead</summary>
+  <details class="compact-details" open><summary>Tap to build a claim (no shorthand typing)</summary>
     <div class="type-grid" id="claim-types"></div>
     <div class="rank-row" id="claim-ranks"></div>
     <div class="rank-row" id="claim-second"></div>
     <button class="ghost" id="apply-taps">Set as latest claim</button>
   </details>
+  <div id="quick-claimant-seats" class="seat-shortcuts" role="group" aria-label="Tap the team who made the latest claim">
+    <span>WHO SPOKE?</span>
+    <button type="button" data-quick-claimant="0">Seat 1</button>
+    <button type="button" data-quick-claimant="1">Seat 2</button>
+    <button type="button" data-quick-claimant="2">Seat 3</button>
+    <button type="button" data-quick-claimant="3">Seat 4</button>
+  </div>
   <div class="fieldrow align-end">
     <label class="field grow">Who claimed it?
       <select id="claimant">
@@ -139,6 +146,21 @@
   <div class="result-grid"><section class="panel">
   <div class="title-row"><h2>How did this hand end?</h2><span class="hint">Record actual outcome</span></div>
   <p class="description">Use this only when a sub-game ends. A recorded outcome updates both teams' points and the next hand's card counts.</p>
+  <div id="quick-outcome-buttons" class="result-shortcuts" role="group" aria-label="Choose how the hand ended">
+    <button type="button" data-quick-outcome="bluff-false">BLUFF correct</button>
+    <button type="button" data-quick-outcome="bluff-true">BLUFF wrong</button>
+    <button type="button" data-quick-outcome="nuts-true">NUTS correct</button>
+    <button type="button" data-quick-outcome="nuts-false">NUTS wrong</button>
+    <button type="button" data-quick-outcome="forced-loss">Claimant timeout / impossible</button>
+    <button type="button" data-quick-outcome="forced-win">Other team timeout</button>
+  </div>
+  <div id="quick-result-seat" class="seat-shortcuts" role="group" aria-label="Choose the other team">
+    <span>OTHER TEAM</span>
+    <button type="button" data-quick-reactor="0">Seat 1</button>
+    <button type="button" data-quick-reactor="1">Seat 2</button>
+    <button type="button" data-quick-reactor="2">Seat 3</button>
+    <button type="button" data-quick-reactor="3">Seat 4</button>
+  </div>
   <div class="fieldrow">
     <label class="field grow">Challenge / ending <select id="outcome">
       <option value="bluff-false">BLUFF correct, claim false</option>
