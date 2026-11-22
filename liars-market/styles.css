@@ -35,3 +35,8 @@
 .flow-stage>.guide{margin-top:14px}
 @media(max-width:1000px){.deal-grid,.play-grid,.result-grid{grid-template-columns:minmax(0,1fr)}.play-primary .hero{position:static}.play-secondary{gap:11px}}
 @media(max-width:560px){.flow-progress{padding:10px}.flow-steps{gap:4px}.flow-steps button{font-size:11px;min-height:46px;padding:7px 2px;gap:4px}.step-index{width:18px;height:18px;font-size:10px}.flow-line{flex-wrap:wrap}.flow-line .hint{font-size:10px}.flow-controls button{flex:1}.reset-control{width:100%;margin:4px 0 0}.play-known{align-items:start;flex-direction:column;padding:10px}.play-known button{width:100%}.stage-finish{align-items:stretch;flex-direction:column}.stage-finish button{width:100%}.deal-grid{gap:11px}}
+
+/* Persistent access to the step-by-step manual from the live trading screen. */
+a.manual-shortcut{display:inline-flex;align-items:center;justify-content:center;gap:6px;margin:5px 10px 5px 0;padding:7px 10px;border-radius:7px;border:1px solid #327f70;background:#173a35;color:#87ead4;font-size:12px;line-height:1.35;font-weight:750;letter-spacing:0;text-decoration:none;max-width:100%;white-space:normal}
+a.manual-shortcut:hover{background:#26574b;border-color:#72dfc4;color:#f3fffb}
+a.manual-shortcut:focus-visible{outline:2px solid #79e8d0;outline-offset:2px}
