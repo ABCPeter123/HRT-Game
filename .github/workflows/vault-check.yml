@@ -1,0 +1,44 @@
+name: Vault decision panel
+
+on:
+  pull_request:
+    paths:
+      - 'vault/**'
+      - 'scripts/build-site.mjs'
+      - '.github/workflows/vault-check.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'vault/**'
+      - 'scripts/build-site.mjs'
+      - '.github/workflows/vault-check.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: vault
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --check engine.js
+      - run: node --check app.js
+      - run: node --check import.js
+      - run: node --check bridge/server.mjs
+      - run: node --check bridge/extension/background.js
+      - run: node --check bridge/extension/capture.js
+      - run: node --check bridge/extension/field-extract.js
+      - run: node --check bridge/extension/popup.js
+      - run: node -e "JSON.parse(require('node:fs').readFileSync('bridge/extension/manifest.json','utf8'))"
+      - run: npm test
+      - run: node ../scripts/build-site.mjs
+      - run: test -f ../dist/vault/index.html && test -f ../dist/vault/engine.js && test -f ../dist/vault/import.js
