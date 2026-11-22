@@ -41,6 +41,42 @@ export function parseTeammateStatus(text){
   return {id:m[1],status,qty:m[3]===undefined?null:Number(m[3]),
     price:m[4]===undefined?null:Number(m[4])};
 }
+/**
+ * Build a status response with clicks instead of typed command syntax.
+ * Never infer an execution price from a limit: callers must supply the
+ * actual cumulative average price, or explicitly choose their limit.
+ */
+export function composeQuickReply(call,{status,qty=null,price=null}={}){
+  if(!call||!/^R[1-3]-\d{3,}$/.test(call.id))
+    throw new Error("Choose a queued order first.");
+  if(["FILLED","CANCELLED","REJECTED"].includes(call.status))
+    throw new Error("This order is already closed.");
+  const allowed=["ACK","WORKING","PARTIAL","FILLED","CANCELLED","REJECTED"];
+  if(!allowed.includes(status))throw new Error("Choose a status button.");
+  if(status==="ACK"&&!["CALLED","ACK"].includes(call.status))
+    throw new Error("The order has already advanced beyond ACK.");
+  if(status==="WORKING"&&(call.filledQty||0)>0)
+    throw new Error("An order with fills stays PARTIAL until complete or cancelled.");
+  if(status==="REJECTED"&&(call.filledQty||0)>0)
+    throw new Error("After a partial fill, cancel only the unfilled remainder.");
+  const filling=["PARTIAL","FILLED"].includes(status);
+  let message=call.id+" "+status;
+  if(filling){
+    const shares=Number(qty),average=Number(price);
+    if(!Number.isSafeInteger(shares)||shares<=0||!Number.isFinite(average)||
+       price===null||price===""||average<0||average>800)
+      throw new Error("Choose cumulative filled shares and confirm the actual average fill price.");
+    if(shares<(call.filledQty||0))
+      throw new Error("Cumulative filled shares cannot decrease.");
+    if(shares>call.qty)throw new Error("Quantity exceeds the original order size.");
+    if(status==="PARTIAL"&&shares>=call.qty)
+      throw new Error("Use FILLED when all shares executed.");
+    if(status==="FILLED"&&shares!==call.qty)
+      throw new Error("FILLED must include all requested shares.");
+    message+=" "+shares+" @ "+average.toFixed(2);
+  }
+  return {text:message,update:parseTeammateStatus(message)};
+}
 function checkedBookValue(book,key){return Number.isFinite(Number(book[key]))?Number(book[key]):0;}
 export function updateCall(book,call,update,{livePosition=false,liveOrders=false,at=Date.now()}={}){
   if(!call||!STATUSES.includes(call.status)||!STATUSES.includes(update?.status))
