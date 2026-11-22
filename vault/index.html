@@ -166,7 +166,7 @@
   <label>Maximum suggested order size <input id="size-limit" type="number" min="10" max="1000" step="1" value="30"></label>
   <div class="settings-actions"><button id="connect-bridge" type="button">Connect Vault local reader</button><button id="disconnect-bridge" class="ghost" type="button" disabled>Stop reader</button>
   <input id="bridge-key" type="password" autocomplete="off" placeholder="Vault reader's 36-character key" aria-label="Bridge session key"></div>
-  <div class="hint" id="bridge-status">Optional. Run <code>node vault/bridge/server.mjs</code>, reload the Vault Chrome extension, and choose <strong>Follow contract dynamically</strong> for reorder-safe prices. The reader imports visible DOM quotes only. Manual entry always works.</div>
+  <div class="hint" id="bridge-status">Optional. Run <code>node vault/bridge/server.mjs</code>, reload the Vault Chrome extension, and choose <strong>Follow contract dynamically</strong> for reorder-safe prices. The reader imports visible DOM quotes only. On phones, use the labeled market fields. The Chrome extension is desktop-only; publishing this page does not turn it into a remote exchange reader. Manual entry always works.</div>
 </section>
 <footer>All decisions are local and advisory. No order is submitted to the real game. Production Vercel deployments remain paused.</footer>
 </div><script type="module" src="./app.js"></script></body></html>
