@@ -1,0 +1,72 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0d1320"><meta name="description" content="Liar's Market two-person user manual for deal, claims, challenges, timers and score reporting."><title>Liar's Market user manual | Quant Comp 2026</title><link rel="stylesheet" href="../manual.css"></head><body><div class="shell"><header class="sitebar"><a href="./">← Back to Liar's Market panel</a><small>QUANT COMP 2026 / GAME 05 / OPERATING MANUAL</small></header><div class="hero"><div class="eyebrow">LIVE OPERATIONS GUIDE</div><h1>Liar's Market user manual</h1><p class="lead">Keep a complete physical card model while your teammate speaks each claim, reacts within ten seconds, and reports the official result.</p><div class="manual-meta"><span>2-person team</span><span>3 rounds · 4 teams per table</span><span>10s reaction · 15s claim</span></div><div class="hero-actions"><a class="button primary" href="./">Open game panel</a><a class="button" href="./README.md">Rules and model reference</a><a class="button" href="#" onclick="window.print();return false;">Print guide</a></div></div><div class="layout"><nav class="toc" aria-label="Manual sections"><strong>IN THIS GUIDE</strong><a href="#quick">60-second overview</a><a href="#setup">Before you start</a><a href="#roles">Two-person workflow</a><a href="#steps">Exact operating steps</a><a href="#calls">Turn and call protocol</a><a href="#recover">Errors and recovery</a><a href="#finish">End-of-hand checklist</a></nav><main><section class="manual-section" id="quick"><div class="kicker">AT A GLANCE</div><h2>One continuous sub-game at a time</h2>
+<p>For each dealt hand, complete the panel in order: <strong>1. Deal cards → 2. Claims &amp; calls → 3. Record result</strong>. The panel automatically advances to the next sub-game when you record a result. Use <strong>Update cards / reveal center</strong> if another face-down center card is turned up.</p>
+<p>This is a <strong>two-person physical card game</strong>, with 3 rounds at tables of four teams. Each round has timed turns, 4 extension cards per team and a local scoreboard. Your official proctor decides which claim, challenge and result is valid.</p></section>
+<section class="manual-section" id="setup"><div class="kicker">BEFORE PLAY</div><h2>Create a reliable table map</h2>
+<ol class="steps">
+<li><strong>Open the panel.</strong> Run <code>python -m http.server 8000</code> from the repository root, then open <code>http://localhost:8000/liars-market/</code>. Keep the screen visible to your teammate but out of sight of opposing teams.</li>
+<li><strong>Pick the round and correct hand.</strong> At the top choose <strong>Round 1–3</strong> and the current <strong>Sub-game</strong>. Select <strong>Hands / round</strong> to match the proctor's instructions. The packet says eight hands in its overview but five in the detailed procedure, so confirm which is used at your table; the panel supports both.</li>
+<li><strong>Fix the seat mapping.</strong> In <strong>1. Deal cards → Scores before this hand</strong>, select <strong>My seat</strong> (Seat 1, 2, 3 or 4) and record each team's current points, not points from another round. Keep the physical clockwise seat order consistent for the entire round.</li>
+<li><strong>Enter every private card you hold.</strong> Under <strong>Your cards and visible center</strong>, choose <strong>My hand</strong> and tap cards in the picker, including a Joker if present. Choose <strong>Face-up center</strong> and tap the three visible common cards. <strong>Do not enter the two center cards face down</strong> until they are turned up. Use <strong>Clear hand</strong> or <strong>Clear center</strong> to correct a mistake.</li>
+<li><strong>Check entry completeness.</strong> Read the stage's card-count warning and the expected hand size from current scores. Do not proceed on a wrong private hand count. Click <strong>Cards entered. Start claims →</strong> when the cards and seats match the physical table.</li>
+</ol>
+<div class="note caution">Your hidden cards and another team's hidden cards are different information. Only enter cards visible to your own team, or publicly revealed to the entire table. The panel cannot see unseen opponent cards; its probabilities are conditional estimates.</div></section>
+<section class="manual-section" id="roles"><div class="kicker">TEAM OF TWO</div><h2>Separate card entry from spoken decisions</h2>
+<div class="twocol"><div class="role"><div class="tag">YOU · CARD / MODEL OPERATOR</div><h3>Keep the panel current</h3><p>Update score and seat order, enter your private and visible center cards, transcribe each spoken claim, identify the claimant, and read back estimated BLUFF/NUTS/PASS values and legal next claims. Handle the local result journal.</p></div>
+<div class="role"><div class="tag">TEAMMATE · TABLE SPEAKER / CLOCK</div><h3>Act at the actual table</h3><p>Listen to the proctor and the other three teams. Tell the panel operator each claim exactly. Make the actual BLUFF/NUTS/PASS choice or hand claim within the time limit. Announce center reveals and the official result after the hand ends.</p></div></div>
+<p><strong>Fast communication:</strong> the speaking player immediately announces claimant seat and claim, then the panel operator reads back the estimated call and its confidence. The speaking player independently checks that it is your team's reaction turn and that the actual time remains. The algorithm does not replace table judgment.</p>
+<p>For one-person teams, use the same sequence but prioritize the official 10-second reaction and 15-second claim clocks. If there isn't time for panel entry, take a legal action at the table first and backfill the result later.</p></section>
+<section class="manual-section" id="steps"><div class="kicker">EVERY SUB-GAME</div><h2>Exact controls and transitions</h2>
+<ol class="steps">
+<li><strong>Stage 1: reset the hand context.</strong> At the start of each new sub-game, check <strong>Scores before this hand</strong>, seat mapping, and the number of private cards dealt to each team. Score deficits can give teams more cards, so stale scores change the model. Use <strong>My hand</strong> to enter every card dealt to you and <strong>Face-up center</strong> to enter three initially revealed common cards.</li>
+<li><strong>Stage 2: capture a spoken claim immediately.</strong> Open <strong>2. Claims &amp; calls</strong>. Under <strong>Latest spoken claim</strong>, enter a shorthand such as <code>2P Q 8</code> for two pairs, Queens and Eights; <code>FH 9 4</code> for a full house; or <code>SF K</code> for King-high straight flush, then click <strong>Apply</strong>. You can instead use <strong>Tap to build a claim instead</strong> and <strong>Set as latest claim</strong>. Choose <strong>Who claimed it?</strong> as the correct seat.</li>
+<li><strong>Read the actual reaction recommendation.</strong> The top decision card shows <strong>BLUFF</strong>, <strong>NUTS</strong> or <strong>PASS</strong>, with modeled probabilities and expected point changes under <strong>Probability and counterplay</strong>. Only make a challenge when it is your seat's reaction priority. “PASS” means decline the current reaction; it does not mean the current claim is automatically correct.</li>
+<li><strong>If it is your claim turn, choose a legal raise.</strong> Scroll to <strong>Top legal claims</strong> and consider a suggested hand that ranks strictly above the previous claim. Tap <strong>Use as claim</strong> to make the selected recommendation the panel's latest claim. Your teammate must <strong>speak the full hand class and significant ranks at the table</strong>. Tapping the app does not speak or submit anything.</li>
+<li><strong>If the proctor reveals another center card, update stage 1.</strong> Choose <strong>Update cards / reveal center</strong>, then <strong>Face-up center</strong> and select the newly turned-up card. Return to <strong>2. Claims &amp; calls</strong>. The panel recalculates the unknown-card scenarios. The two initially face-down cards are revealed before the marker team's second and third turns.</li>
+<li><strong>Use the local timer correctly.</strong> Under <strong>Reaction timer</strong>, use <strong>Reaction 10s</strong> for a response, <strong>Claim 15s</strong> for a turn, or <strong>Extension 30s</strong> after an officially spent +15s extension. Press <strong>Stop</strong> if timing changes. Update the extension count via <strong>Use 1</strong> on the relevant seat only after that team spends one. Each team has four per round.</li>
+<li><strong>Stage 3: record the actual outcome.</strong> Once a challenge or forced ending settles the hand, click <strong>Someone called / hand ended → Record result</strong>. Under <strong>How did this hand end?</strong>, select the real event, identify the <strong>Other team</strong>, and if applicable answer <strong>If NUTS was wrong: did claim exist?</strong> according to what was actually revealed. Check the <strong>Point transfer preview</strong>.</li>
+<li><strong>Advance only after verifying scores.</strong> Click <strong>Record result + next</strong>. The app saves the point transfer and opens the next hand's Deal cards stage automatically. To fix an incorrect last result, use <strong>Undo latest result</strong>. After the final hand in a round, the panel advances to the next round where applicable.</li>
+</ol></section>
+<section class="manual-section" id="calls"><div class="kicker">SHORT SPOKEN COMMANDS</div><h2>Turn-by-turn coordination</h2>
+<pre><code>TABLE SPEAKER → PANEL OPERATOR
+"Seat 3 claimed two pair, Queens and Eights."
+"Seat 1 reacted PASS. Our reaction priority now."
+
+PANEL OPERATOR → TABLE SPEAKER
+"Current claim 2P Q 8, model suggests BLUFF.
+Check official 10-second clock."
+or
+"Our turn to claim. Suggested FH 9 4, legal above last."
+
+TABLE SPEAKER → PANEL OPERATOR
+"Marker's second turn; flip center 4D.
+Return to Deal cards, add 4D."
+
+TABLE SPEAKER → PANEL OPERATOR
+"Seat 2 called NUTS, incorrect.
+Claim did exist. Claimant wins one point.
+Record result and advance."</code></pre>
+<p>Example outcomes above are illustrative. The speaker must repeat any recommendation in human terms before acting. The operator should announce if the card set is incomplete or the table's action order differs from the panel's current seat/claim state.</p>
+<h3>Risk checks for BLUFF vs NUTS</h3>
+<ul><li><strong>BLUFF</strong> claims the named hand is absent from all active cards. It loses if the claim actually exists. Jokers are wild and may help produce it.</li>
+<li><strong>NUTS</strong> claims the hand both exists <em>and</em> is the strongest available among active cards. An existing but nonmaximal hand makes a Nuts challenge incorrect.</li>
+<li><strong>PASS</strong> does not reveal anything. If you cannot verify an unseen hand, the model estimates probability rather than certainty.</li>
+<li><strong>Legal raising order differs from poker:</strong> six of a kind, five of a kind, straight flush, four of a kind, full house, three of a kind, two pair, straight, pair, then high card. There is no ordinary flush hand class.</li>
+<li><strong>Timeouts have consequences:</strong> missing your claim turn loses the hand (except the first turn, which defaults to High Card 2); missing a reaction is treated as passing.</li></ul></section>
+<section class="manual-section" id="recover"><div class="kicker">TROUBLESHOOT</div><h2>Resolve stale hand or score state fast</h2>
+<table><thead><tr><th>Problem</th><th>Correction</th></tr></thead><tbody>
+<tr><td>Wrong claimant seat</td><td>Update <strong>Who claimed it?</strong> and reapply the actual claim. The opponent model depends on this identity.</td></tr>
+<tr><td>New center card appears</td><td>Click <strong>Update cards / reveal center</strong>, choose the newly face-up card, then return to claims. Never enter a still-hidden center card.</td></tr>
+<tr><td>Hand card-count warning</td><td>Check current scoreboard, <strong>My seat</strong>, and all private cards. Catch-up dealing changes hand size as scores move.</td></tr>
+<tr><td>Unclear claims shorthand</td><td>Use the tap-based builder, specifying all required hand ranks. An incomplete “two pair” claim is not legal.</td></tr>
+<tr><td>Only seconds remain</td><td>Let your teammate take the official action first. Enter the hand, claim or result afterward rather than missing the real deadline.</td></tr>
+<tr><td>Incorrect recorded result</td><td>Use <strong>Undo latest result</strong>, then re-enter the actual challenge and claimant/opponent identities.</td></tr>
+<tr><td>Grand finals</td><td>Do not use the regular-round point/catch-up model to score the life-elimination final. That final uses two lives.</td></tr>
+<tr><td>New full restart</td><td>Click <strong>Reset entire Game 5</strong> and confirm; all three rounds, sub-games and opponent-learning history are erased locally.</td></tr>
+</tbody></table></section>
+<section class="manual-section" id="finish"><div class="kicker">BEFORE THE NEXT DEAL</div><h2>Completion checklist</h2>
+<ul class="checks"><li>Actual final spoken claim and claimant seat match the panel.</li>
+<li>BLUFF/NUTS/forced ending is recorded exactly as the proctor adjudicated.</li>
+<li>Point transfer preview matches the official scoring of the hand.</li>
+<li>One <strong>Record result + next</strong> action was made, with no duplicate result.</li>
+<li>Next hand's card counts were recomputed from updated scores, and extension counts remain accurate.</li>
+<li>New center and private card entries are made only from what the next hand reveals.</li></ul></section></main></div><footer class="bottom"><a href="./">Back to live panel</a><a href="../">All five games</a><p>The official proctor and actual table countdown determine allowed actions and scored results.</p></footer></div></body></html>
