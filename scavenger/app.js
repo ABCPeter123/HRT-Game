@@ -1,6 +1,7 @@
 import {
   PHASES, clamp, parseSamples, sampleHint, sampleCostFraction, estimatePool,
   recommendBid, optimalFinalGuess, refinePoolFromResults, inferOpponentProfiles,
+  learnAcrossRounds, calibratePoolEstimate, recommendSampleCount,
   OPPONENT_PROFILES, roundScore, guessPayout
 } from "./engine.js";
 
@@ -20,12 +21,13 @@ const format = (value, digits = 1) => Number.isFinite(value)
 const percent = (v) => format(100*v,1)+"%";
 
 function newRound() {
-  return {phase:0,percentile:"",sampleCount:"0",samples:"",anchor:"",
+  return {phase:0,roomSize:6,percentile:"",sampleCount:"0",samples:"",anchor:"",
     auctions:[{bid:"",rank:"",payout:""},{bid:"",rank:"",payout:""},{bid:"",rank:"",payout:""}],
     finalGuess:"",actualPool:""};
 }
 function defaultState() {
   return {version:1,activeRound:0,roomSize:6,style:"auto",risk:0.35,
+    crossRoundLearning:true,
     rounds:Array.from({length:5},()=>newRound())};
 }
 function loadState() {
@@ -37,8 +39,10 @@ function loadState() {
     clean.roomSize=raw.roomSize===7?7:6;
     clean.style=["auto","cautious","normal","aggressive"].includes(raw.style)?raw.style:"auto";
     clean.risk=clamp(number(raw.risk),0,1);
+    clean.crossRoundLearning=raw.crossRoundLearning!==false;
     clean.rounds=raw.rounds.map(item=>({
       ...newRound(),...(item||{}),phase:clamp(number(item?.phase),0,4),
+      roomSize:item?.roomSize===7?7:item?.roomSize===6?6:clean.roomSize,
       auctions:Array.from({length:3},(_,i)=>({
         bid:String(item?.auctions?.[i]?.bid??""),
         rank:String(item?.auctions?.[i]?.rank??""),
@@ -82,7 +86,9 @@ function choiceButtons(options,selected,dataName) {
     '" data-choice="'+dataName+'" data-value="'+escape(value)+'">'+escape(label)+'</button>').join("")+'</div>';
 }
 function samplePane() {
-  const r=current(), suggested=sampleHint(number(r.percentile,50));
+  const r=current();
+  const history=learnAcrossRounds(state.rounds,state.activeRound,{enabled:state.crossRoundLearning});
+  const suggested=recommendSampleCount(number(r.percentile,50),history).count;
   return '<div class="field"><label for="percentile">Given distribution percentile</label>'+
     '<div class="stepper"><button type="button" class="step-btn" data-step="-1" aria-label="Percentile minus one">−</button>'+
     '<input class="input" id="percentile" data-field="percentile" type="number" min="0" max="100" step="1" inputmode="numeric" placeholder="e.g. 80" value="'+escape(r.percentile)+'" aria-label="Given percentile">'+
@@ -106,7 +112,7 @@ function samplePane() {
 function auctionPane(i) {
   const r=current(),a=r.auctions[i],third=i===2;
   return '<div class="field"><div class="field-inline"><label>Room size</label></div>'+
-    choiceButtons([[6,"6 players"],[7,"7 players"]],state.roomSize,"roomSize")+
+    choiceButtons([[6,"6 players"],[7,"7 players"]],current().roomSize,"roomSize")+
     '<span class="hint">Include yourself when counting the players in your room. Select 6 or 7 from the competition display.</span></div>'+
     '<div class="field"><label>Opponent tendency (optional)</label>'+
     choiceButtons([["auto","AUTO"],["cautious","Mostly low"],["normal","Mixed"],["aggressive","Mostly high"]],state.style,"style")+
@@ -118,9 +124,9 @@ function auctionPane(i) {
     '<div class="field"><label for="actualBid">Your submitted bid</label>'+
     '<input id="actualBid" class="input" data-auction="'+i+'" data-auction-field="bid" type="number" inputmode="numeric" min="0" step="1" value="'+escape(a.bid)+'" placeholder="Use recommendation or enter actual bid"></div>'+
     '<div class="field"><label>Rank shown after auction</label>'+
-    '<div class="choice-row rank-buttons" id="rankChoices">'+Array.from({length:state.roomSize},(_,j)=>j+1).map(j=>
+    '<div class="choice-row rank-buttons" id="rankChoices">'+Array.from({length:current().roomSize},(_,j)=>j+1).map(j=>
       '<button type="button" class="choice-btn mini'+(number(a.rank)===j?' selected':'')+'" data-rank="'+j+'" data-auction="'+i+'">'+j+'</button>').join("")+'</div>'+
-    '<span class="hint">1 = lowest bid, '+state.roomSize+' = highest bid. Leave empty before results.</span></div>'+
+    '<span class="hint">1 = lowest bid, '+current().roomSize+' = highest bid. Leave empty before results.</span></div>'+
     '<div class="field"><label for="actualPayout">Your payout after this auction</label>'+
     '<input id="actualPayout" class="input" data-auction="'+i+'" data-auction-field="payout" type="number" step="any" inputmode="decimal" value="'+escape(a.payout)+'" placeholder="Enter displayed points">'+
     '<span class="hint">Use the exact points shown in the result screen. Negative payout is possible if you were the highest bidder.</span></div>'+
@@ -163,7 +169,7 @@ function renderJournal() {
 }
 
 const GUIDE_COMMON=[
-  ["Round 1–5","Select the current round. Rooms change between rounds, so rival behavior is learned only within the selected round."],
+  ["Round 1–5","Earlier rounds provide a weak strategic prior. The current room still gets its own rapidly updated opponent model. No later round is used when reviewing an earlier one."],
   ["Phase buttons","Use Info, A1, A2, A3, Final. Switch immediately when the official game advances."],
   ["Timer","Tap Start when a phase starts. This is only your local countdown, not the official clock. Reset restarts this phase's countdown."]
 ];
@@ -176,7 +182,7 @@ const GUIDE_PHASES=[
   ],
   [
     ["Room size","Count your own player plus competitors: 6 or 7 total."],
-    ["Opponent tendency","AUTO learns from your ranks in the same round. Mostly low, Mixed, and Mostly high are manual hypotheses, not confirmed opponent identities."],
+    ["Opponent tendency","AUTO starts from weak patterns learned across previous rooms and updates using THIS room's ranks. A manual tendency overrides much of that prior."],
     ["Downside sensitivity","0–100% controls your simulated-risk penalty: score = expected payout − 0.35 × slider fraction × simulated payout SD. It cannot guarantee a maximum loss."],
     ["Your submitted bid","Record the integer you actually placed in the competition, or tap Fill bid field to copy the suggested value into this panel."],
     ["Your bid rank","After results, tap your rank. Rank 1 is the lowest bidder; rank 6 or 7 is the highest. The game provides your rank and payout, not rivals' full bids."],
@@ -185,7 +191,7 @@ const GUIDE_PHASES=[
   ],
   [
     ["Your final guess","Use the integer in the recommendation and submit it on the competition screen. Fill final guess only records it in this panel."],
-    ["Actual pool size","Optional. Enter the revealed true pool afterward so your round score can be calculated."]
+    ["Actual pool size","Enter the revealed actual pool. This supplies verified training data for later rounds and enables round scoring. A rank-1 payout below your bid can also reveal the pool."]
   ]
 ];
 function guideLine([label,description]) {
@@ -197,15 +203,18 @@ function renderGuide() {
   $("guideContent").innerHTML='<div class="guide-list">'+
     GUIDE_COMMON.concat(stage).map(guideLine).join("")+'</div>';
 }
-function renderCounterplay(bidResult,pool) {
+function renderCounterplay(bidResult,pool,learning) {
   const p=phase(),r=current();
   const through=Math.min(3,p);
   const observations=r.auctions.slice(0,through).filter(a=>a.bid!==""&&a.rank!=="");
   const profile=inferOpponentProfiles({estimate:pool,history:observations,
-    roomSize:state.roomSize,style:state.style,seed:state.activeRound*997+2026});
+    roomSize:current().roomSize,style:state.style,seed:state.activeRound*997+2026,
+    historicalWeights:learning?.historicalWeights});
   $("opponentStatus").textContent=profile.observations+" / 3 RANKS";
   const top=OPPONENT_PROFILES.find(item=>item.key===profile.dominant);
-  const certainty=profile.observations===0?"Starting assumptions":profile.observations===1?"Limited evidence":"Updating from recorded ranks";
+  const certainty=profile.observations===0?
+    (learning?.rankCount?"Prior rounds + fresh room":"Starting assumptions"):
+    profile.observations===1?"1 observation in current room":"Updating with current-room ranks";
   const items=OPPONENT_PROFILES.map(item=>{
     const pct=Math.round(100*profile.weights[item.key]);
     return '<div class="profile-line"><div><span>'+escape(item.label)+'</span><strong>'+pct+'%</strong></div>'+
@@ -215,13 +224,13 @@ function renderCounterplay(bidResult,pool) {
     '<div class="profile-heading">'+escape(certainty)+'</div>'+
     '<div class="profile-bars">'+items+'</div>'+
     '<div class="row-note counter-tip"><strong>Counterplan:</strong> '+escape(top.counter)+'</div>'+
-    '<p class="hint">Percentages are estimates from rank outcomes and your selected crowd tendency. They are not measured proportions of players. Opponents change between rounds.</p>';
+    '<p class="hint">Scenario percentages reflect previous-round patterns (when enabled), your manual tendency, and current-room bid ranks. Different rounds have different opponents. These are not measured player proportions.</p>';
   let candidates=bidResult;
   let phaseLabel=p>=1&&p<=3?"Current auction":"";
   const currentFinished=p>=1&&p<3&&r.auctions[p-1].bid!==""&&r.auctions[p-1].rank!=="";
   if(currentFinished && pool) {
-    candidates=recommendBid({estimate:pool,roomSize:state.roomSize,
-      history:observations,style:state.style,risk:state.risk,
+    candidates=recommendBid({estimate:pool,roomSize:current().roomSize,
+      history:observations,style:state.style,risk:state.risk,learning,
       phase:p+1,seed:state.activeRound*997+2026});
     phaseLabel="Next auction";
   }
@@ -240,6 +249,42 @@ function renderCounterplay(bidResult,pool) {
       ).join("")+'</div>'+
       '<p class="hint spaced">Each row assumes that particular crowd style dominates. The large recommendation above combines all three scenarios using their current estimated probabilities.</p>';
   }
+}
+
+
+function renderLearning(learning,rawEstimate,calibratedEstimate) {
+  const flag=learning.enabled,has=learning.verifiedPoolCount||learning.rankCount;
+  const toggler=$("toggleLearning");
+  toggler.textContent=flag?"Prior rounds ON":"Prior rounds OFF";
+  toggler.setAttribute("aria-pressed",flag?"true":"false");
+  const status=$("learningStatus");
+  status.textContent=!flag?"OFF":!has?"NO HISTORY":learning.verifiedPoolCount+" POOLS · "+learning.rankCount+" RANKS";
+  const stats=[];
+  stats.push(pair("Previous rounds available",learning.priorRounds+" / 4"));
+  stats.push(pair("Verified previous pools",String(learning.verifiedPoolCount)));
+  stats.push(pair("Prior auction ranks used",String(learning.rankCount)));
+  stats.push(pair("Previous pool relative error",learning.avgRelativePoolError===null?"Need outcomes":percent(learning.avgRelativePoolError)));
+  if(learning.bestFamily)stats.push(pair("Best historical candidate",learning.bestFamily));
+  if(learning.rankCount)stats.push(pair("Prior rival bid scale",format(learning.roomScale,2)+"×"));
+  if(rawEstimate && calibratedEstimate && rawEstimate!==calibratedEstimate){
+    const difference=calibratedEstimate.value-rawEstimate.value;
+    stats.push(pair("Current pool model shift",(difference>=0?"+":"")+format(difference)));
+  }
+  const modelRows=learning.rows.filter(x=>x.poolKnown||x.ranks).map(x=>
+    '<div class="learning-history"><span>Round '+x.round+'</span><span>'+
+    (x.poolKnown?"Pool "+(x.poolSource==="entered"?"entered":"inferred")+
+      (x.error!==null?" · error "+percent(x.error):" · no samples"):
+      "No verified pool")+
+    '</span><strong>'+x.ranks+' ranks</strong></div>'
+  ).join("");
+  const note=!flag?
+    "Historical learning is disabled for this round. Your saved results are unchanged. Current-round auctions still adapt.":
+    !has?"Record rank results in earlier rounds. Enter the actual pool after each round, or log a capped lowest-bid payout, to train the pool estimator.":
+    "Only earlier rounds train this model. Previous pool outcomes reweight distribution candidates. Previous bid ranks give a weak prior for a new room. Live auction ranks still carry more weight.";
+  $("learningDetails").innerHTML=
+    '<div class="learning-stats">'+stats.join("")+'</div>'+
+    (modelRows?'<div class="learning-history-list">'+modelRows+'</div>':"")+
+    '<p class="hint spaced">'+escape(note)+'</p>';
 }
 
 function render() {
@@ -262,15 +307,18 @@ function render() {
 }
 function renderAdvice() {
   const r=current(),p=r.phase;
+  const learning=learnAcrossRounds(state.rounds,state.activeRound,{enabled:state.crossRoundLearning});
   const initialPool=r.percentile===""?null:estimatePool({percentile:number(r.percentile),samples:r.samples,anchor:r.anchor});
-  const pool=p===0?initialPool:refinePoolFromResults(initialPool,r.auctions.slice(0,p-1),state.roomSize);
+  const calibrated=calibratePoolEstimate(initialPool,learning);
+  const pool=p===0?calibrated:refinePoolFromResults(calibrated,r.auctions.slice(0,p-1),current().roomSize);
   const cost=sampleCostFraction(number(r.sampleCount));
   let currentBidResult=null;
   const metrics=[],set=(k,v)=>metrics.push(metric(k,v));
   $("confidenceChip").textContent=pool?.confidence||"NO SCALE";
   $("actionNumber").classList.remove("missing");
   if(p===0){
-    const hint=sampleHint(number(r.percentile,50));
+    const samples=recommendSampleCount(number(r.percentile,50),learning);
+    const hint=samples.count;
     recommendation=hint;
     $("actionLabel").textContent="Suggested sample purchase";
     $("actionNumber").textContent=String(hint);
@@ -279,12 +327,12 @@ function renderAdvice() {
     set("Entered / purchased",parseSamples(r.samples).length+" / "+number(r.sampleCount));
     if(pool){set("Estimated pool",format(pool.value));set("Model range",format(pool.lo)+" to "+format(pool.hi));}
     else{set("Pool estimate","Need scale");set("Estimate confidence","Not available");}
-    $("modelNote").textContent="The sample count is a starting heuristic. With no known distribution parameters or rival bidding behavior, the information purchase cannot be optimized exactly. More samples improve inference but cost more points.";
+    $("modelNote").textContent=samples.reason+" Sample purchasing is heuristic: previous outcomes cannot tell us what would have happened if we had bought a different number. Buying samples costs pool × √n / 12.";
     $("ruleReminder").innerHTML="<strong>60 seconds.</strong> Buy samples at cost pool × √n / 12. You receive the pool's distribution percentile but not its distribution or parameters. Negative net scores are possible.";
   }else if(p>=1&&p<=3){
     const history=r.auctions.slice(0,p-1).filter(a=>a.bid!==""&&a.rank!=="");
-    const result=recommendBid({estimate:pool,roomSize:state.roomSize,style:state.style,
-      history,phase:p,risk:state.risk,seed:state.activeRound*997+2026});
+    const result=recommendBid({estimate:pool,roomSize:current().roomSize,style:state.style,
+      history,phase:p,risk:state.risk,learning,seed:state.activeRound*997+2026});
     currentBidResult=result;
     recommendation=result?.bid??null;
     $("actionLabel").textContent="Recommended integer bid"+(p===3?" · 2× round":"");
@@ -299,7 +347,7 @@ function renderAdvice() {
       set("Rival bid adjustment",format(result.roomScale,2)+"×");
       set("Pool estimate",format(pool.value));
     } else {set("Available pool scale","None");set("Auction rank","1–3 or highest pays");}
-    $("modelNote").textContent="Combines low-, mixed- and high-bid opponent scenarios. Observed ranks from earlier auctions update their probabilities. Downside sensitivity penalizes payout volatility, not worst-case loss. Ties are modeled conservatively.";
+    $("modelNote").textContent="Simulates low-, mixed- and high-bid opponents. Prior rounds provide weak shared assumptions; ranks from THIS round update the current room. Downside sensitivity penalizes volatility, not worst-case loss.";
     $("ruleReminder").innerHTML="<strong>Auction "+p+" of 3.</strong> One nonnegative integer bid. Lowest three bids get capped payouts. Highest gets remainder − |remainder − bid| and can lose points. Other ranks get 0. Auction 3 earns double points in the round score.";
   }else{
     const result=optimalFinalGuess(pool,{seed:state.activeRound*113+2026});
@@ -318,7 +366,8 @@ function renderAdvice() {
     $("ruleReminder").innerHTML="<strong>90 seconds.</strong> Final guess reward is max(pool/4 − |guess − pool|, 0). Total round score is A1 + A2 + 2×A3 + final guess − pool×√n/12.";
   }
   $("metrics").innerHTML='<div class="metric-grid">'+metrics.join("")+'</div>';
-  renderCounterplay(currentBidResult,pool);
+  renderCounterplay(currentBidResult,pool,learning);
+  renderLearning(learning,initialPool,calibrated);
   const canUse=recommendation!==null;
   $("useSuggestion").disabled=!canUse;
   $("copySuggestion").disabled=!canUse;
@@ -328,7 +377,7 @@ function renderAdvice() {
 }
 function updateChoice(key,value) {
   if(key==="sampleCount"){current().sampleCount=value;}
-  else if(key==="roomSize"){state.roomSize=Number(value)===7?7:6;}
+  else if(key==="roomSize"){current().roomSize=Number(value)===7?7:6;}
   else if(key==="style"){state.style=value;}
   save();render();
 }
@@ -397,6 +446,11 @@ document.addEventListener("input",handleInput);
 document.addEventListener("click",async (event)=>{
   const button=event.target.closest("button");
   if(!button)return;
+  if(button.id==="toggleLearning"){
+    state.crossRoundLearning=!state.crossRoundLearning;save();render();
+    note(state.crossRoundLearning?"Using earlier rounds in recommendations.":"Historical learning off. Past data preserved.");
+    return;
+  }
   if(button.id==="timerToggle")return toggleTimer();
   if(button.id==="timerReset")return resetTimer();
   if(button.id==="useSuggestion")return useRecommendation();

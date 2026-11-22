@@ -4,7 +4,9 @@ import { performance } from "node:perf_hooks";
 import {
   inverseNormal, parseSamples, sampleCostFraction, sampleHint,
   auctionPayout, guessPayout, roundScore, estimatePool,
-  optimalFinalGuess, recommendBid, inferRoomScale, refinePoolFromResults, inferOpponentProfiles, OPPONENT_PROFILES
+  optimalFinalGuess, recommendBid, inferRoomScale, refinePoolFromResults,
+  inferOpponentProfiles, learnAcrossRounds, calibratePoolEstimate,
+  recommendSampleCount, OPPONENT_PROFILES
 } from "../engine.js";
 
 test("sample parsing, costs and hint are consistent with the packet",()=>{
@@ -180,4 +182,169 @@ test("risk sensitivity does not claim an actual loss cap",()=>{
     assert.ok(Number.isFinite(bid.sd));
     assert.ok(bid.lossProbability>=0&&bid.lossProbability<=1);
   }
+});
+
+const roundForTraining=(percentile,samples,actualPool,auctions=[],roomSize=6)=>({
+  roomSize,percentile:String(percentile),samples,actualPool:String(actualPool??""),
+  sampleCount:String(parseSamples(samples).length),
+  auctions:Array.from({length:3},(_,i)=>auctions[i]||{bid:"",rank:"",payout:""})
+});
+const closeTo=(actual,expected,tolerance=1e-9)=>
+  assert.ok(Math.abs(actual-expected)<=tolerance,actual+" differs from "+expected);
+
+test("cross-round learning begins neutral and does not require hidden training state",()=>{
+  const rounds=Array.from({length:5},()=>roundForTraining(50,"",""));
+  const l=learnAcrossRounds(rounds,0);
+  assert.equal(l.priorRounds,0);
+  assert.equal(l.verifiedPoolCount,0);
+  assert.equal(l.rankCount,0);
+  closeTo(l.roomScale,1);
+  closeTo(Object.values(l.historicalWeights).reduce((a,b)=>a+b,0),1);
+  assert.equal(recommendSampleCount(50,l).count,3);
+});
+test("learning uses strictly earlier rounds, never future rounds or current true pool",()=>{
+  const first=roundForTraining(75,"10 20 30 40 50",28,[
+    {bid:"8",rank:"6",payout:"8"}]);
+  const current=roundForTraining(20,"100 200 300",900,[
+    {bid:"500",rank:"1",payout:"400"}]);
+  const future=roundForTraining(90,"900 1200 2000",3100,[
+    {bid:"2000",rank:"7",payout:"30"}],7);
+  const full=[first,current,future];
+  const initial=learnAcrossRounds(full,0);
+  const next=learnAcrossRounds(full,1);
+  const editedFuture=learnAcrossRounds([first,current,{
+    ...future,actualPool:"10",auctions:[{bid:"5",rank:"1",payout:"4"}]
+  }],1);
+  assert.equal(initial.verifiedPoolCount,0);
+  assert.equal(next.verifiedPoolCount,1);
+  assert.equal(next.rankCount,1);
+  assert.deepEqual(editedFuture,next,"Future edits must not retroactively affect Round 2 recommendations");
+  const round3=learnAcrossRounds(full,2);
+  assert.equal(round3.verifiedPoolCount,2);
+  assert.equal(round3.rankCount,2);
+});
+test("missing true outcomes and manual anchors never fabricate pool training",()=>{
+  const first=roundForTraining(50,"10 15 20","",[{bid:"80",rank:"4",payout:"0"}]);
+  first.anchor="1500";
+  const l=learnAcrossRounds([first,roundForTraining(50,"","")],1);
+  assert.equal(l.verifiedPoolCount,0);
+  assert.equal(l.rankCount,1);
+  assert.equal(l.avgRelativePoolError,null);
+  const raw=estimatePool({percentile:50,samples:"10 15 20"});
+  assert.strictEqual(calibratePoolEstimate(raw,l),raw);
+});
+test("capped rank-one payout supplies logically exact prior pool for training",()=>{
+  const prior=roundForTraining(55,"35 42 50 70 80",null,[
+    {bid:"100",rank:"1",payout:"65"}]);
+  const l=learnAcrossRounds([prior,roundForTraining(50,"","")],1);
+  assert.equal(l.verifiedPoolCount,1);
+  assert.equal(l.payoutInferredPools,1);
+  assert.equal(l.rows[0].poolSource,"inferred from rank-1 payout");
+  assert.ok(Number.isFinite(l.avgRelativePoolError));
+});
+test("prior-round pool outcomes reweight candidates without pretending exact confidence",()=>{
+  const first=roundForTraining(80,"60 70 75 85 120 160",200);
+  const second=roundForTraining(85,"45 70 80 100 115 185",175);
+  const history=learnAcrossRounds([first,second,roundForTraining(50,"","")],2);
+  assert.equal(history.verifiedPoolCount,2);
+  assert.ok(Object.keys(history.familyMultipliers).length>=4);
+  assert.ok(history.poolStrength>0 && history.poolStrength<=0.55);
+  const baseline=estimatePool({percentile:90,samples:"30 50 90 100 120 180"});
+  const modified=calibratePoolEstimate(baseline,history);
+  closeTo(modified.candidates.reduce((sum,c)=>sum+c.weight,0),1);
+  assert.ok(modified.lo<=modified.value && modified.hi>=modified.value);
+  assert.ok(modified.standardError>=baseline.standardError);
+  assert.equal(modified.calibratedFrom,2);
+  const firstPass=calibratePoolEstimate(baseline,history);
+  assert.deepEqual(modified,firstPass,"Calibration should be reproducible on every render");
+});
+test("exact current pool inference and rough manual anchor override history calibration",()=>{
+  const old=roundForTraining(90,"20 40 50 90 100 120",200);
+  const l=learnAcrossRounds([old,roundForTraining(50,"","")],1);
+  const manual=estimatePool({percentile:50,samples:[],anchor:500});
+  assert.strictEqual(calibratePoolEstimate(manual,l),manual);
+  const exact=refinePoolFromResults(null,[{bid:"120",rank:"1",payout:"80"}],6);
+  assert.strictEqual(calibratePoolEstimate(exact,l),exact);
+  assert.equal(exact.value,80);
+});
+test("previous-room opponent model contributes a weak but non-zero adaptive prior",()=>{
+  const past=[
+    roundForTraining(50,"10 20 25 30 40 50",45,[
+      {bid:"15",rank:"6",payout:"0"},{bid:"18",rank:"6",payout:"0"},{bid:"20",rank:"5",payout:"0"}],6),
+    roundForTraining(50,"25 30 40 50 70 90",55,[
+      {bid:"15",rank:"7",payout:"0"},{bid:"20",rank:"6",payout:"0"},{bid:"21",rank:"6",payout:"0"}],7),
+    roundForTraining(50,"50 60 70 80 85 95",80,[
+      {bid:"20",rank:"6",payout:"0"},{bid:"25",rank:"5",payout:"0"}],6)
+  ];
+  const l=learnAcrossRounds([...past,roundForTraining(50,"","")],3);
+  assert.equal(l.rankCount,8);
+  assert.equal(l.evidenceRounds,3);
+  assert.ok(l.historicalWeights.cautious>0.32);
+  closeTo(Object.values(l.historicalWeights).reduce((a,b)=>a+b,0),1);
+  assert.ok(l.roomScale>=0.8 && l.roomScale<=1.25);
+  const e=estimatePool({percentile:50,samples:"40 50 60 70 80"});
+  const baseline=inferOpponentProfiles({estimate:e,style:"auto",history:[]});
+  const adapted=inferOpponentProfiles({estimate:e,style:"auto",history:[],
+    historicalWeights:l.historicalWeights});
+  assert.ok(adapted.weights.cautious>baseline.weights.cautious);
+  const result=recommendBid({estimate:e,learning:l,phase:1,scenarios:90});
+  assert.ok(Number.isInteger(result.bid));
+  assert.ok(result.profile.weights.cautious>baseline.weights.cautious);
+  assert.ok(result.roomScale>=0.65&&result.roomScale<=1.65);
+});
+test("manual opponent choice retains priority over weak cross-round model",()=>{
+  const e=estimatePool({percentile:60,samples:"20 30 35 42 55 80"});
+  const weights={cautious:1,normal:0,aggressive:0};
+  const manual=inferOpponentProfiles({estimate:e,style:"aggressive",
+    historicalWeights:weights,history:[]});
+  assert.ok(manual.weights.aggressive>manual.weights.cautious);
+});
+test("disabling historical learning leaves current-room rank adaptation intact",()=>{
+  const previous=roundForTraining(75,"10 15 20 30 60",100,[
+    {bid:"15",rank:"6",payout:"0"}]);
+  const disabled=learnAcrossRounds([previous,roundForTraining(70,"","")],1,{enabled:false});
+  assert.equal(disabled.enabled,false);
+  assert.equal(disabled.verifiedPoolCount,0);
+  assert.equal(disabled.rankCount,0);
+  const e=estimatePool({percentile:70,samples:"25 35 40 50 60"});
+  const ranks=[{bid:"10",rank:"6"}];
+  const withToggle=recommendBid({estimate:e,learning:disabled,history:ranks,scenarios:80});
+  const withoutToggle=recommendBid({estimate:e,history:ranks,scenarios:80});
+  assert.equal(withToggle.bid,withoutToggle.bid);
+  assert.deepEqual(withToggle.profile.weights,withoutToggle.profile.weights);
+  assert.equal(inferOpponentProfiles({estimate:e,history:ranks}).observations,1);
+});
+test("sample policy changes by at most one and only with adequate verified outcomes",()=>{
+  const noHistory=recommendSampleCount(95);
+  assert.equal(noHistory.count,4);
+  const poor={enabled:true,verifiedPoolCount:3,avgRelativePoolError:.28,avgSamples:3};
+  assert.equal(recommendSampleCount(95,poor).count,5);
+  assert.equal(recommendSampleCount(50,poor).count,4);
+  const good={enabled:true,verifiedPoolCount:3,avgRelativePoolError:.025,avgSamples:5};
+  assert.equal(recommendSampleCount(95,good).count,3);
+  assert.equal(recommendSampleCount(50,good).count,2);
+  const tooFew={enabled:true,verifiedPoolCount:1,avgRelativePoolError:.75,avgSamples:2};
+  assert.equal(recommendSampleCount(50,tooFew).count,3);
+});
+test("old rounds without explicit room-size remain valid for historical learning",()=>{
+  const old=roundForTraining(50,"10 15 20 22 25",20,[{bid:"10",rank:"6",payout:"0"}]);
+  delete old.roomSize;
+  const l=learnAcrossRounds([old,roundForTraining(60,"","")],1);
+  assert.equal(l.rankCount,1);
+  assert.equal(l.verifiedPoolCount,1);
+});
+test("learning calculations remain responsive on all five rounds",()=>{
+  const rounds=Array.from({length:5},(_,i)=>roundForTraining(25+i*15,
+    "25 35 45 50 60 70 90",80+i*10,[
+      {bid:"12",rank:"1",payout:"12"},
+      {bid:"25",rank:"4",payout:"0"},
+      {bid:"85",rank:"6",payout:"20"}]));
+  const start=performance.now();
+  for(let i=0;i<15;i++){
+    const learn=learnAcrossRounds(rounds,4);
+    const e=calibratePoolEstimate(estimatePool({percentile:80,samples:"30 45 50 65 75"}),learn);
+    const r=recommendBid({estimate:e,learning:learn,phase:3,scenarios:100});
+    assert.ok(Number.isInteger(r.bid));
+  }
+  assert.ok(performance.now()-start<4000,"Repeated learned recommendations exceeded interactive latency");
 });

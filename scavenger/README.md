@@ -16,7 +16,7 @@ Then visit \`http://localhost:8000/scavenger/\`. The panel uses native JavaScrip
 2. Set the number of samples you actually bought and enter sample values separated by spaces or commas. Percentile alone does **not** identify a pool size; if you bought no samples, you may enter a manually estimated pool as a rough anchor.
 3. Go to Auction 1. Read the suggested integer bid, then submit it **in the actual competition app**. Use "Fill bid field" to store the recommendation locally. After the result, tap your bid rank (1 = lowest, 6/7 = highest), enter payout, and go to Auction 2. Do the same for Auctions 2 and 3.
 4. In Final guess, use the suggested integer guess, submit it in the actual competition app and record the true pool if revealed.
-5. Repeat for later rounds. Each round has isolated saved inputs and results. Use the on-screen timer to keep track of the 60-second information and bidding windows and the 90-second final guess window.
+5. Repeat for later rounds. Each round has isolated saved inputs and results; earlier results now inform later-round recommendations. A separate long-term learning panel shows what was learned. Use the on-screen timer for the 60-second information and bidding windows and the 90-second final guess window.
 
 Shortcuts: Alt+1 to Alt+5 jump to a phase; Alt+Enter fills the current recommended action. The interface supports touch screens and mobile widths.
 
@@ -27,6 +27,22 @@ The panel now includes a collapsible **Input guide** for every field. Informatio
 Under each auction recommendation, the **Opponent counterplay** panel shows probabilities of the three crowd models and corresponding alternative bids. After you enter your rank, the next auction automatically adapts. These counterbids are conditional hypotheses; do not interpret them as exact knowledge of opponent bids.
 
 The live Vercel deployment is intentionally paused. Changes pushed to GitHub are not automatically published. Run the static server locally to test the latest changes, or explicitly request a deployment when ready.
+
+## Cross-round adaptive learning
+
+The Scavenger panel now learns across its five rounds. The **Cross-round learning** card shows how many earlier verified pool values and bid ranks the engine used, the past pool estimation error, the historically best-performing distribution candidate, a conservative prior rival-bidding adjustment, and any shift to this round's estimate. The **Prior rounds ON/OFF** button lets you compare the baseline and learned decisions without losing saved data. Its setting is saved in your browser.
+
+**How to feed it:** In Round 1, enter the given percentile, all purchased sample values, your actual bids, displayed ranks, auction payouts, and the actual pool revealed at the end. Switch to Round 2. The panel immediately re-estimates from Round 1. Repeat for subsequent rounds. If a rank-1 auction payout is smaller than your submitted bid, that payout exactly reveals the pool according to the packet's payout rule and can serve as verified training data even if the true pool isn't separately displayed.
+
+**Two levels of adaptation:**
+
+- **Across rounds:** Previous verified pool values and corresponding sample observations score the normal, uniform, shifted-exponential, two-humped, two-point, and empirical estimators. Past relative estimation errors modestly reweight the estimator mixture and can widen uncertainty. Previous rank observations form a *weak* initial probability for low-, mixed-, and high-bid opponent patterns and a limited normalization of their bidding scale.
+- **Within the current room:** This round's bid ranks immediately update that room's opponent strategy probabilities. The current room's observations have more influence than older rounds because the competitors change.
+- **Sampling policy:** The default recommendation remains 3 samples or 4 at an extreme percentile. If at least two previous pool outcomes show large estimation errors with relatively few samples, it proposes one additional sample. With at least three accurate examples purchased at higher sample counts, it may propose one fewer. This is a conservative heuristic, not an optimized value-of-information policy.
+
+**Anti-leakage rules:** Only rounds strictly *before* the selected round contribute to cross-round learning. A round never trains itself using its own final revealed pool, and later rounds cannot change what the model would have recommended in an earlier round. Editing a past result instantly recomputes only subsequent rounds' learned assumptions. The engine derives these weights directly from existing locally saved round data, so there is no separate model file to lose or corrupt. Round-specific room sizes are saved and used to interpret the rank data, including 6- and 7-player rooms.
+
+The learning model is intentionally conservative. With only four previous rounds, statistical evidence is weak. A previous winner can be an imperfect guide to the next distribution family, room, or opponent mix. Logged bid ranks do not reveal exact rival bids, and observed outcomes from one number of purchased samples do not prove what would have happened if a different number had been purchased. There is no external model training, server sync, or competition data feed.
 
 ## What the engine actually optimizes
 
@@ -72,4 +88,4 @@ The tests cover sample costs, the exact auction payoff function, including cappe
 
 The panel is an adviser. It cannot read live competition data or submit actual trades or guesses. You must manually enter observations and execute the advised action through the competition interface. If the lowest bid was capped (the payout is lower than the bid), the panel can infer the pool size exactly and use that for later auctions. A highest-bid payout can establish a lower bound on the pool even if the initial sample fit was weak.
 
-The other four WQC game folders are scaffolded for their own real-time panels.
+Baskets is also implemented in `baskets/`. Other game panels are separate projects.

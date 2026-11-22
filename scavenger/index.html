@@ -76,6 +76,17 @@
           <div id="opponentInsights" aria-live="polite"></div>
           <div id="opponentCounters"></div>
         </section>
+        <section class="panel learning-panel" aria-labelledby="learningHeading">
+          <div class="panel-top compact">
+            <div><div class="eyebrow">CROSS-ROUND LEARNING</div><h2 id="learningHeading">Learn from earlier results</h2></div>
+            <span class="phase-tag" id="learningStatus">NO HISTORY</span>
+          </div>
+          <div class="learning-controls">
+            <button id="toggleLearning" type="button" class="button secondary" aria-pressed="true">Prior rounds ON</button>
+            <span class="hint">Compare learned vs baseline recommendations. Saves your choice.</span>
+          </div>
+          <div id="learningDetails" aria-live="polite"></div>
+        </section>
         <section class="panel info-panel" aria-labelledby="quickHeading">
           <div class="eyebrow">SCORING RULE</div><h2 id="quickHeading">What matters</h2>
           <div id="ruleReminder" class="rule-text"></div>

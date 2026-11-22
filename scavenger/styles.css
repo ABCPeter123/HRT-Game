@@ -30,3 +30,17 @@
 .counter-row span{font-size:11px;color:var(--muted)}
 .counter-number{font-size:23px;font-weight:760;color:var(--teal);font-variant-numeric:tabular-nums;letter-spacing:-.025em}
 @media(max-width:600px){.guide-line{grid-template-columns:minmax(90px,.45fr) minmax(0,1fr);gap:8px}.input-guide summary span{font-size:10px}.counter-row{padding:11px 0}}
+
+/* Explain cross-round training without crowding the time-critical controls. */
+.learning-panel{background:#131d2b}
+.learning-controls{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:13px}
+.learning-controls .button{padding:8px 11px;min-height:33px;font-size:11px}
+.learning-controls .button[aria-pressed="true"]{border-color:#4b8c7f;color:var(--teal)}
+.learning-controls .hint{flex:1;min-width:150px}
+.learning-stats .journal-bottom{padding:7px 0;gap:14px}
+.learning-history-list{border-top:1px solid var(--line);margin-top:12px;padding-top:7px}
+.learning-history{display:grid;grid-template-columns:64px minmax(0,1fr) auto;align-items:center;gap:8px;padding:7px 0;font-size:11px;color:var(--secondary);border-bottom:1px solid #263646}
+.learning-history strong{font-weight:700;color:var(--text);white-space:nowrap}
+.learning-history span:first-child{color:var(--text);font-weight:720}
+.learning-panel .spaced{margin-top:13px}
+@media(max-width:600px){.learning-history{grid-template-columns:55px minmax(0,1fr) auto;font-size:10px}}

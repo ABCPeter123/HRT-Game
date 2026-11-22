@@ -225,8 +225,8 @@ export function refinePoolFromResults(estimate, history = [], roomSize = 6) {
   return {...estimate,value,lo:minimum,hi:Math.max(minimum+1,estimate.hi),
     family:estimate.family+" + payout bound",candidates};
 }
-export function inferRoomScale(history, estimate, roomSize=6) {
-  if(!estimate?.value || !history?.length)return 1;
+export function inferRoomScale(history, estimate, roomSize=6, priorScale=1) {
+  if(!estimate?.value || !history?.length)return clamp(priorScale,0.65,1.65);
   // Convert past rank to an approximate cumulative distribution of rival bids.
   // Observations are coarse and involve changing opponents; shrink aggressively.
   const expectedQuantiles=[0.10,0.16,0.25,0.36,0.53,0.74,0.95];
@@ -237,9 +237,9 @@ export function inferRoomScale(history, estimate, roomSize=6) {
     const target=expectedQuantiles[Math.min(expectedQuantiles.length-1,rank-1)];
     if(target>0)scales.push(clamp(bid/(Math.max(1,estimate.value)*target),0.4,2.5));
   }
-  if(!scales.length)return 1;
+  if(!scales.length)return clamp(priorScale,0.65,1.65);
   const logAverage=scales.reduce((s,v)=>s+Math.log(v),0)/scales.length;
-  return clamp(Math.exp(logAverage*0.45),0.65,1.65);
+  return clamp(clamp(priorScale,0.65,1.65)*Math.exp(logAverage*0.45),0.65,1.65);
 }
 export const OPPONENT_PROFILES = [
   {key:"cautious",label:"Low-bid crowd",counter:"Small bids crowd the three lowest slots. Compare a cheap qualifying bid with a well-calibrated highest bid."},
@@ -258,6 +258,12 @@ function opponentBid(rng, estimateValue, style, roomScale) {
   const fraction=r<hunterProbability+0.045 ? 0.56+0.52*rng() : 0.10+0.34*rng();
   return Math.max(0,Math.round(center*belief*fraction));
 }
+function normalizedHistoricalProfile(weights) {
+  if(!weights || typeof weights!=="object")return null;
+  const values=PROFILE_KEYS.map(key=>clamp(finite(weights[key],0),0,1));
+  const total=values.reduce((a,b)=>a+b,0);
+  return total>0?values.map(v=>v/total):null;
+}
 function startingProfileWeights(style) {
   const priors={
     auto:[0.32,0.36,0.32],
@@ -273,8 +279,15 @@ function choose(n,k) {
   for(let j=1;j<=Math.min(k,n-k);j++)c=c*(n-j+1)/j;
   return c;
 }
-export function inferOpponentProfiles({estimate,history=[],roomSize=6,style="auto",seed=2026}={}) {
-  const prior=startingProfileWeights(style), room=roomSize===7?7:6;
+export function inferOpponentProfiles({estimate,history=[],roomSize=6,style="auto",seed=2026,
+  historicalWeights=null}={}) {
+  const baseline=startingProfileWeights(style);
+  const old=normalizedHistoricalProfile(historicalWeights);
+  // Previous rooms have different competitors. In AUTO, use a shrinkage prior;
+  // a manual tendency continues to take precedence over historical patterns.
+  const blend=old?(style==="auto"?0.70:0.20):0;
+  const prior=baseline.map((v,i)=>(1-blend)*v+blend*(old?.[i]??v));
+  const room=roomSize===7?7:6;
   const evidence=history.filter(item=>item && item.bid!=="" && item.rank!=="" &&
     item.bid!==null && item.rank!==null && Number.isFinite(Number(item.bid)) &&
     Number.isInteger(Number(item.rank)) && Number(item.rank)>=1 && Number(item.rank)<=room);
@@ -307,6 +320,170 @@ export function inferOpponentProfiles({estimate,history=[],roomSize=6,style="aut
   const w=log.map(x=>Math.exp(x-top)),sum=w.reduce((a,b)=>a+b,0);
   return result(w.map(x=>x/sum),evidence.length);
 }
+
+/**
+ * Rebuild historical calibration deterministically from previously finished
+ * rounds. No new model state is written, so editing a past result re-trains
+ * later rounds automatically and never contaminates the past with future data.
+ * Historical opponents and generating distributions can change every round.
+ */
+export function learnAcrossRounds(rounds=[],activeRound=0,{enabled=true}={}) {
+  const baseWeights={cautious:0.32,normal:0.36,aggressive:0.32};
+  const empty={
+    enabled,priorRounds:0,evidenceRounds:0,verifiedPoolCount:0,
+    payoutInferredPools:0,rankCount:0,avgRelativePoolError:null,avgSamples:null,
+    historicalWeights:baseWeights,roomScale:1,familyMultipliers:{},
+    bestFamily:null,poolStrength:0,rivalStrength:0,rows:[]
+  };
+  if(!enabled || !Array.isArray(rounds) || activeRound<=0)return empty;
+  const previous=rounds.slice(0,Math.min(rounds.length,Math.max(0,Math.floor(activeRound))));
+  const rows=[],familyLoss=new Map(),poolErrors=[],sampleSizes=[];
+  const rivalTotals=[0,0,0],rivalScales=[],rivalWeights=[];
+  let rankCount=0,payoutInferredPools=0,evidenceRounds=0;
+  for(let i=0;i<previous.length;i++){
+    const r=previous[i]||{};
+    const room=r.roomSize===7?7:6;
+    const percentile=r.percentile!==""&&r.percentile!=null&&Number.isFinite(Number(r.percentile))
+      ?clamp(Number(r.percentile),0,100):null;
+    const observed=parseSamples(r.samples);
+    const guess=percentile!==null && observed.length>0
+      ?estimatePool({percentile,samples:observed}):null;
+    const results=Array.isArray(r.auctions)?r.auctions.slice(0,3):[];
+    const ranks=results.filter(x=>x && x.bid!==""&&x.bid!=null &&
+      x.rank!==""&&x.rank!=null && Number.isFinite(Number(x.bid)) &&
+      Number(x.bid)>=0 && Number.isInteger(Number(x.rank)) &&
+      Number(x.rank)>=1 && Number(x.rank)<=room);
+    // Actual pool entered after the round, or the logically exact inference
+    // from a capped rank-1 payout. Guessed anchors are never labeled truth.
+    const observedPool=r.actualPool!=="" && r.actualPool!=null &&
+      Number.isFinite(Number(r.actualPool)) && Number(r.actualPool)>0?Number(r.actualPool):null;
+    const inferred=observedPool===null?refinePoolFromResults(null,results,room):null;
+    const pool=observedPool??((inferred?.confidence==="EXACT FROM PAYOUT"&&inferred.value>0)?inferred.value:null);
+    if(observedPool===null && pool!==null)payoutInferredPools++;
+    let error=null;
+    if(pool!==null && guess){
+      error=Math.abs(guess.value-pool)/Math.max(1,Math.abs(pool));
+      poolErrors.push(clamp(error,0,2));
+      sampleSizes.push(observed.length);
+      for(const c of guess.candidates){
+        const penalty=clamp(Math.abs(c.value-pool)/Math.max(1,Math.abs(pool)),0,2);
+        const entry=familyLoss.get(c.name)||{sum:0,weight:0};
+        const quality=Math.min(1,observed.length/5);
+        entry.sum+=quality*penalty;entry.weight+=quality;
+        familyLoss.set(c.name,entry);
+      }
+    }
+    if(ranks.length){
+      // Normalize each room's own observations by that room's pool scale.
+      // Only a modest fraction of their pattern carries into the new room.
+      const scale=pool??guess?.value??null;
+      if(scale>0){
+        const proxy={value:scale};
+        const posterior=inferOpponentProfiles({estimate:proxy,history:ranks,
+          roomSize:room,style:"auto",seed:1643+i*29});
+        const w=Math.min(2,ranks.length);
+        PROFILE_KEYS.forEach((key,j)=>{rivalTotals[j]+=w*posterior.weights[key];});
+        rivalWeights.push(w);
+        rivalScales.push({scale:inferRoomScale(ranks,proxy,room),weight:w});
+        rankCount+=ranks.length;
+      }
+    }
+    if(error!==null||ranks.length)evidenceRounds++;
+    rows.push({
+      round:i+1,poolKnown:pool!==null,poolSource:observedPool!==null?"entered":
+        pool!==null?"inferred from rank-1 payout":null,
+      sampleCount:observed.length,error,
+      ranks:ranks.length
+    });
+  }
+  const familyMultipliers={};
+  let bestFamily=null;
+  if(poolErrors.length){
+    const quality=Array.from(familyLoss,([name,row])=>({
+      name,quality:Math.exp(-3.5*row.sum/Math.max(1e-9,row.weight))
+    }));
+    const average=quality.reduce((sum,x)=>sum+x.quality,0)/quality.length;
+    quality.sort((a,b)=>b.quality-a.quality);
+    bestFamily=quality[0]?.name??null;
+    for(const item of quality)familyMultipliers[item.name]=clamp(item.quality/Math.max(.01,average),.45,1.65);
+  }
+  const rivalCount=rivalWeights.reduce((a,b)=>a+b,0);
+  const rivalStrength=rankCount?Math.min(.42,0.55*rankCount/(rankCount+6)):0;
+  const historicalWeights={...baseWeights};
+  let roomScale=1;
+  if(rivalCount>0){
+    PROFILE_KEYS.forEach((key,j)=>{
+      historicalWeights[key]=(1-rivalStrength)*baseWeights[key]+
+        rivalStrength*rivalTotals[j]/rivalCount;
+    });
+    const logScale=rivalScales.reduce((sum,row)=>sum+row.weight*Math.log(row.scale),0)/rivalCount;
+    roomScale=clamp(Math.exp(logScale*rivalStrength),.8,1.25);
+  }
+  return {
+    enabled:true,priorRounds:previous.length,evidenceRounds,
+    verifiedPoolCount:poolErrors.length,payoutInferredPools,rankCount,
+    avgRelativePoolError:poolErrors.length?mean(poolErrors):null,
+    avgSamples:sampleSizes.length?mean(sampleSizes):null,
+    historicalWeights,roomScale,familyMultipliers,bestFamily,
+    poolStrength:poolErrors.length?Math.min(.55,poolErrors.length/(poolErrors.length+2)):0,
+    rivalStrength,rows
+  };
+}
+
+/**
+ * Reweight candidate families using past verified outcomes. Strong shrinkage
+ * prevents four or fewer observed rounds from creating false certainty.
+ * No calibration applies to a manual anchor or exactly inferred current pool.
+ */
+export function calibratePoolEstimate(estimate,learning) {
+  if(!estimate || !learning?.enabled || !learning.verifiedPoolCount ||
+    !estimate.candidates?.length ||
+    estimate.confidence==="EXACT FROM PAYOUT" || estimate.family==="Manual estimate")return estimate;
+  const strength=learning.poolStrength;
+  const adjusted=estimate.candidates.map(c=>({
+    ...c,weight:c.weight*(1-strength+strength*(learning.familyMultipliers[c.name]??1))
+  }));
+  const total=adjusted.reduce((sum,x)=>sum+x.weight,0);
+  const candidates=adjusted.map(c=>({...c,weight:c.weight/total}));
+  const value=candidates.reduce((sum,c)=>sum+c.value*c.weight,0);
+  // Measured prior-round errors can broaden uncertain current estimates but
+  // should not force a narrow confidence interval from only a few examples.
+  const err=learning.avgRelativePoolError??0;
+  const widthFactor=1+Math.min(.4,Math.max(0,err-.10)*1.5);
+  const sd=Math.max(.001,(estimate.standardError||Math.max(1,estimate.value*.3))*widthFactor);
+  const lo=Math.max(0,Math.min(estimate.lo,...candidates.map(c=>c.value))-1.15*sd);
+  const hi=Math.max(value+1,estimate.hi,Math.max(...candidates.map(c=>c.value))+1.15*sd);
+  return {...estimate,value,candidates,lo,hi,standardError:sd,
+    family:estimate.family+" (prior rounds calibrated)",
+    calibratedFrom:learning.verifiedPoolCount};
+}
+
+/**
+ * Conservative sample-purchase policy. Realized round outcomes do not reveal
+ * counterfactual results with a different number of samples. Therefore each
+ * adjustment is at most one sample and is explicitly a heuristic.
+ */
+export function recommendSampleCount(percentile,learning=null){
+  const base=sampleHint(percentile);
+  const cases=learning?.enabled?learning.verifiedPoolCount:0;
+  let count=base,reason="Baseline starting rule; no verified earlier-round pool outcomes.";
+  if(cases>=2){
+    const error=learning.avgRelativePoolError;
+    if(error>.18 && (learning.avgSamples??base)<=4){
+      count=Math.min(6,base+1);
+      reason="Earlier pool estimates had high relative error; try one extra sample. This is not a counterfactual optimization.";
+    }else if(cases>=3 && error<.045 && (learning.avgSamples??0)>=4){
+      count=Math.max(2,base-1);
+      reason="Earlier estimates were relatively accurate with at least four samples; test one fewer to save fees.";
+    }else{
+      reason="Earlier pool outcomes are available, but evidence does not justify changing the baseline purchase.";
+    }
+  }else if(cases===1){
+    reason="One verified earlier pool is too little evidence to change the sample count.";
+  }
+  return {count,baseline:base,reason,verifiedRounds:cases,feeFraction:sampleCostFraction(count)};
+}
+
 function payoffAtBid(b,pool,rivals) {
   let below=0;
   for(const rival of rivals)if(rival<=b)below++;
@@ -324,13 +501,14 @@ function payoffAtBid(b,pool,rivals) {
   return {rank,payout:0};
 }
 export function recommendBid({estimate,roomSize=6,history=[],style="auto",phase=1,seed=2026,
-  scenarios=220,risk=0}={}) {
+  scenarios=220,risk=0,learning=null}={}) {
   if(!estimate)return null;
   const room=roomSize===7?7:6;
-  const profile=inferOpponentProfiles({estimate,roomSize:room,history,style,seed});
+  const profile=inferOpponentProfiles({estimate,roomSize:room,history,style,seed,
+    historicalWeights:learning?.historicalWeights});
   const rng=rngFromSeed(hashedSeed([seed,room,"opponent-scenarios"]));
   const pools=posteriorDraws(estimate,Math.max(80,Math.min(600,scenarios)),seed);
-  const roomScale=inferRoomScale(history,estimate,room);
+  const roomScale=inferRoomScale(history,estimate,room,learning?.roomScale??1);
   const simulations=pools.map(pool=>({
     pool,rivals:PROFILE_KEYS.map(key=>Array.from({length:room-1},
       ()=>opponentBid(rng,estimate.value,key,roomScale)).sort((a,b)=>a-b))
