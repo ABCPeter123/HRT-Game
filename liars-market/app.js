@@ -52,7 +52,7 @@ function resultPreview(){
   const outcome=$("outcome").value;
   const shift=payout(g.claim,outcome),before=g.scores.map(Number);
   const predicted=before.slice();predicted[claimant]+=shift;predicted[other]-=shift;
-  dest.textContent=seatText(claimant)+" "+signed(shift)+" points; "+seatText(other)+" "+signed(-shift)+
+  dest.textContent="Final claim: "+formatClaim(g.claim)+". "+seatText(claimant)+" "+signed(shift)+" points; "+seatText(other)+" "+signed(-shift)+
     " points. Next scores: "+predicted.map((v,i)=>"Seat "+(i+1)+": "+signed(v)).join(" · ")+".";
 }
 function renderFlow(){
@@ -185,7 +185,11 @@ function toggleCard(id){
   if(g.hand.includes(id)){g.hand=g.hand.filter(x=>x!==id);}
   else if(g.center.includes(id)){g.center=g.center.filter(x=>x!==id);}
   else if(key==="center"&&g.center.length>=5){setNotice("Only five center cards exist.");return;}
-  else g[key].push(id);
+  else {
+    g[key].push(id);
+    if(key==="hand"&&g.hand.length===handSize(Number(g.scores[state.mySeat])||0)&&g.center.length<3)
+      zone="center"; // The next cards to enter are the three visible center cards.
+  }
   g.hand.sort((a,b)=>a-b);g.center.sort((a,b)=>a-b);
   store();renderDeck();calculate();
 }
@@ -392,7 +396,7 @@ $("reset-game").addEventListener("click",()=>{
   if(!window.confirm("Erase ALL saved Liar's Market rounds, cards, claims, scores, opponent learning and timers? This cannot be undone."))return;
   if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
   timerRemaining=10;timerUntil=0;
-  try{localStorage.removeItem(KEY);}catch{}
+  try{localStorage.removeItem(KEY);}catch{setNotice("Storage could not be cleared. Reset cancelled.");return;}
   state=fresh();zone="hand";builder={type:"pair",a:14,b:13,step:"a"};lastEvaluation=null;
   $("claim-quick").value="";$("nuts-exists").value="";$("outcome").value="bluff-false";
   renderAll();paintTimer();setNotice("All Liar's Market game data reset. Round 1, hand 1.");
