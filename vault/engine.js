@@ -17,7 +17,7 @@ export const defaultBook=()=>({bid:"",ask:"",bidSize:"",askSize:"",position:0,wo
   workingSells:0,ownBid:"",ownAsk:"",ownBidSize:"",ownAskSize:"",cash:0,ledgerComplete:true});
 export const defaultRound=(role="maker")=>({role,elapsed:0,clockRunning:false,penalty:0,
   chips:newChips(),books:Object.fromEntries(SYMBOLS.map(s=>[s,defaultBook()])),
-  fills:[],lastQuoteFillAt:-Infinity,notes:[]});
+  fills:[],lastQuoteFillAt:{VAULT:-Infinity,G5:-Infinity,PUB:-Infinity},notes:[]});
 export const roleForRound=(cohort,round)=>{
   if(!["maker14","maker23"].includes(cohort))throw Error("Invalid cohort");
   return (cohort==="maker14"?[1,4]:[2,3]).includes(round)?"maker":"taker";
@@ -152,7 +152,7 @@ export function makerPenalty(sym,book,wmax,{elapsed=120,lastQuoteFillAt=-Infinit
     Number(book.ownAsk):spec.max;
   const effectiveSpread=Math.max(0,ask-bid);
   const grace=elapsed<10||(elapsed-lastQuoteFillAt>=0&&elapsed-lastQuoteFillAt<5);
-  return {bid,ask,effectiveSpread,grace,rate:grace?0:rounded(.01*Math.max(0,effectiveSpread-wmax)),
+  return {bid,ask,effectiveSpread,grace,rate:grace?0:.01*Math.max(0,effectiveSpread-wmax),
     unpenalized:effectiveSpread<=wmax+1e-8};
 }
 export function suggest(sym,model,book,{role="maker",risk=.35,maxOrder=30,elapsed=0,lastQuoteFillAt=-Infinity}={}){
@@ -185,7 +185,8 @@ export function suggest(sym,model,book,{role="maker",risk=.35,maxOrder=30,elapse
   const quoted=buyQty>=10&&sellQty>=10;
   const quotes={bid,ask,buyQty,sellQty,width:rounded(ask-bid),
     qualifying:quoted,withinWmax:ask-bid<=wmax+1e-7};
-  const penalty=makerPenalty(sym,book,wmax,{elapsed,lastQuoteFillAt});
+  const penalty=makerPenalty(sym,book,wmax,{elapsed,lastQuoteFillAt:typeof lastQuoteFillAt==="object"&&lastQuoteFillAt!==null?
+    (lastQuoteFillAt[sym]??-Infinity):lastQuoteFillAt});
   const suggested=quoted?{kind:"QUOTE",symbol:sym,side:"BOTH",bid,ask,
     buyQty,sellQty,score:0,note:"Post two separate resting limit orders; size >=10 each. Confirm they are live."}:null;
   // Aggress only when more useful than a two-way quote, at a substantial excess edge.
@@ -195,8 +196,19 @@ export function suggest(sym,model,book,{role="maker",risk=.35,maxOrder=30,elapse
 export function recommend(model,books,options={}){
   const items=Object.fromEntries(SYMBOLS.map(sym=>[sym,suggest(sym,model,books[sym]||defaultBook(),options)]));
   const actions=SYMBOLS.map(sym=>items[sym].action).filter(Boolean);
-  const best=actions.filter(x=>x.kind==="IOC").sort((a,b)=>b.score-a.score)[0]||
-    (options.role==="maker"?actions.find(x=>x.kind==="QUOTE"):null)||null;
+  const bestIoc=actions.filter(x=>x.kind==="IOC").sort((a,b)=>b.score-a.score)[0]||null;
+  // Makers must first maintain qualifying two-way quotes in each contract. A great
+  // taker opportunity does not erase the per-second quoting obligation.
+  const urgentQuotes=options.role==="maker"?SYMBOLS.map(sym=>items[sym])
+    .filter(x=>x.quotes?.qualifying && x.penalty&&
+      (x.penalty.effectiveSpread>x.wmax+1e-9 ||
+       Number(books[x.symbol]?.ownBidSize)<10||Number(books[x.symbol]?.ownAskSize)<10))
+    .sort((a,b)=>b.penalty.rate-a.penalty.rate):[];
+  const urgent=urgentQuotes[0];
+  const urgentOrder=urgent?{kind:"QUOTE",symbol:urgent.symbol,side:"BOTH",
+    bid:urgent.quotes.bid,ask:urgent.quotes.ask,buyQty:urgent.quotes.buyQty,
+    sellQty:urgent.quotes.sellQty,note:"Restore qualifying maker quotes before opportunistic trades."}:null;
+  const best=urgentOrder||bestIoc||(options.role==="maker"?actions.find(x=>x.kind==="QUOTE"):null)||null;
   return {items,best};
 }
 export function applyFill(book,role,{side,quantity,price,quoted=false,symbol}){
