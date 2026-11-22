@@ -177,7 +177,7 @@ function fakeTable(rows,headings=["Symbol","Bid","Ask"]){
  const table={querySelectorAll:selector=>
    selector==="thead th, thead [role=columnheader]"?th:[]};
  for(const row of rows)row.table=table;
- for(const row of rows)row.closest=()=>table;
+ for(const row of rows)row.closest=selector=>selector==="table"?table:null;
  return table;
 }
 function domRows(rows){
