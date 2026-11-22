@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {emptyBook,emptyRound} from "../engine.js";
-import {emptyDesk,createCall,teammateCallText,parseTeammateStatus,
+import {emptyDesk,createCall,teammateCallText,parseTeammateStatus,composeQuickReply,
  updateCall,observeRepricing,addPriceAlert,classifyPriceAlert,pendingAlerts,
  accountingSnapshot,undoReportedStatus} from "../desk-engine.js";
 const action={symbol:"GRID",side:"BUY",qty:20,price:399.5,kind:"MAKE"};
@@ -198,4 +198,43 @@ test("local status snapshots distinguish working reservations from actual fills"
  });
  assert.equal(undo.book.position,"0");
  assert.equal(undo.book.cash,"0");
+});
+
+test("click composer assembles ACK, WORKING, CANCELLED and REJECTED without typed syntax",()=>{
+ const call=make();
+ for(const status of ["ACK","WORKING","CANCELLED","REJECTED"]){
+  const x=composeQuickReply(call,{status});
+  assert.equal(x.text,"R1-001 "+status);
+  assert.equal(x.update.status,status);
+ }
+ assert.throws(()=>composeQuickReply(call,{status:"UNKNOWN"}),/status/);
+});
+test("click composer requires actual average fill price and valid cumulative quantities",()=>{
+ const call=make();
+ assert.deepEqual(composeQuickReply(call,{status:"PARTIAL",qty:8,price:399.5}),{
+  text:"R1-001 PARTIAL 8 @ 399.50",
+  update:{id:"R1-001",status:"PARTIAL",qty:8,price:399.5}
+ });
+ assert.equal(composeQuickReply(call,{status:"FILLED",qty:20,price:400.25}).text,
+  "R1-001 FILLED 20 @ 400.25");
+ for(const args of [
+  {status:"PARTIAL",qty:8,price:null},
+  {status:"PARTIAL",qty:8,price:""},
+  {status:"PARTIAL",qty:0,price:399.5},
+  {status:"PARTIAL",qty:20,price:399.5},
+  {status:"FILLED",qty:10,price:399.5},
+  {status:"FILLED",qty:20,price:801}
+ ])assert.throws(()=>composeQuickReply(call,args));
+});
+test("click composer respects partial-fill restrictions and closed orders",()=>{
+ let call=make(),book=emptyBook();
+ ({call,book}=updateCall(book,call,{status:"PARTIAL",qty:8,price:399.5}));
+ assert.throws(()=>composeQuickReply(call,{status:"ACK"}),/ACK/);
+ assert.throws(()=>composeQuickReply(call,{status:"WORKING"}),/PARTIAL/);
+ assert.throws(()=>composeQuickReply(call,{status:"REJECTED"}),/cancel/);
+ assert.throws(()=>composeQuickReply(call,{status:"PARTIAL",qty:7,price:399.5}),/decrease/);
+ assert.equal(composeQuickReply(call,{status:"FILLED",qty:20,price:399.5}).update.qty,20);
+ assert.equal(composeQuickReply(call,{status:"CANCELLED"}).text,"R1-001 CANCELLED");
+ ({call,book}=updateCall(book,call,{status:"FILLED",qty:20,price:399.5}));
+ assert.throws(()=>composeQuickReply(call,{status:"WORKING"}),/closed/);
 });
