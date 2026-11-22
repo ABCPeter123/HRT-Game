@@ -1,5 +1,5 @@
 /* Static panel cache: only small, public UI assets. Never caches user inputs. */
-const CACHE = "quant-comp-panels-2026-v8";
+const CACHE = "quant-comp-panels-2026-v9";
 const ASSETS = [
   "./index.html",
   "./scavenger/index.html",
@@ -20,7 +20,12 @@ const ASSETS = [
   "./treasures-and-trash/index.html",
   "./treasures-and-trash/styles.css",
   "./treasures-and-trash/app.js",
-  "./treasures-and-trash/engine.js"
+  "./treasures-and-trash/engine.js",
+  "./vault/index.html",
+  "./vault/styles.css",
+  "./vault/app.js",
+  "./vault/engine.js",
+  "./vault/import.js"
 ];
 self.addEventListener("install", event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))
@@ -35,7 +40,7 @@ self.addEventListener("activate", event => {
 self.addEventListener("fetch", event => {
   const request=event.request, url=new URL(request.url);
   if(request.method!=="GET" || url.origin!==self.location.origin) return;
-  const isPanel=url.pathname.includes("/scavenger/") || url.pathname.includes("/baskets/") || url.pathname.includes("/liars-market/") || url.pathname.includes("/treasures-and-trash/") || url.pathname.endsWith("/index.html");
+  const isPanel=url.pathname.includes("/scavenger/") || url.pathname.includes("/baskets/") || url.pathname.includes("/liars-market/") || url.pathname.includes("/treasures-and-trash/") || url.pathname.includes("/vault/") || url.pathname.endsWith("/index.html");
   if(!isPanel && request.mode!=="navigate")return;
   event.respondWith(caches.match(request).then(async cached => {
     if(cached)return cached;
@@ -52,6 +57,7 @@ self.addEventListener("fetch", event => {
       if(url.pathname.endsWith("/baskets/"))return cache.match("./baskets/index.html");
       if(url.pathname.endsWith("/liars-market/"))return cache.match("./liars-market/index.html");
       if(url.pathname.endsWith("/treasures-and-trash/"))return cache.match("./treasures-and-trash/index.html");
+      if(url.pathname.endsWith("/vault/"))return cache.match("./vault/index.html");
       if(request.mode==="navigate")return cache.match("./index.html");
       throw new Error("Offline asset unavailable");
     }
