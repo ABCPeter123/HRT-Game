@@ -15,6 +15,16 @@ Open http://localhost:8000/liars-market/ and enter your current information. No 
 
 Source of competition rules: official WQC Fall 2026 Trading Competition packet, pages 17-19. The packet overview says *eight* sub-games per round while the detailed rules say *five*. The panel defaults to eight but supports both. Verify with your table's proctor.
 
+## Continuous sub-game flow
+
+The panel presents **three steps for each sub-game**: **Deal cards → Claims & calls → Record result**. Each step shows only the controls needed for that moment. The step is saved for the selected sub-game. The top progress buttons let you revisit earlier steps without losing entries.
+
+- **Deal cards:** enter the pre-hand scoreboard, your cards, and the visible center cards. Choose **Cards entered. Start claims**.
+- **Claims & calls:** update the latest claim whenever another team raises. Recommendations refresh after each entry. If the proctor flips a new center card, select **Update cards / reveal center**, tap the card, then return to **Claims & calls**.
+- **Record result:** when someone calls BLUFF, NUTS, or loses by timeout/impossible raise, select the actual result and other seat. Check the point-transfer preview, then **Record result + next**. The next hand opens automatically at Deal cards. Finishing the last hand also advances to the next round, except after Round 3.
+
+To erase **every saved Liar's Market round and restart at Round 1, Hand 1**, use **Reset entire Game 5** in the top toolbar and confirm. Resetting this game does not clear other games. The main competition homepage also has an **Erase all saved game data** control for all implemented game panels. Both require confirmation.
+
 ## Fast turn workflow
 
 1. Select Round 1–3 and the sub-game. The four seats correspond to clockwise teams; set **My seat** once. Enter current scores so the model knows how many private cards the proctor deals to each team.
