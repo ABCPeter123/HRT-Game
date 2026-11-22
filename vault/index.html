@@ -76,7 +76,13 @@
             <label>Rounded mean shown<input id="combo-value" type="number" min="1" max="10" step="1" inputmode="numeric" placeholder="1 to 10"></label>
           </div>
           <label>True value (when explicitly revealed)<input id="true-value" type="number" min="1" max="10" step="1" inputmode="numeric" placeholder="Unknown"></label>
-          <div class="inline"><button class="primary" id="save-chip" type="button">Save chip &amp; update prices</button><button class="ghost" id="clear-chip" type="button">Clear chip</button><button class="ghost" id="next-chip" type="button">Next chip →</button></div>
+          <div class="chip-tap-pad" id="chip-tap-pad">
+            <div class="pad-intro"><strong>ENTER CHIP DATA WITH BUTTONS</strong><span>Select a field, tap its number, then save</span></div>
+            <div class="pad-targets" id="chip-pad-targets" role="group" aria-label="Select chip field to fill"></div>
+            <div class="pad-values" id="chip-pad-values" role="group" aria-label="Choose observed chip value"></div>
+            <p id="chip-pad-note" class="hint">Choose only numbers actually revealed in the game.</p>
+          </div>
+          <div class="inline"><button class="primary" id="save-chip" type="button">Save chip &amp; update prices</button><button class="primary" id="save-next-chip" type="button">Save &amp; next chip →</button><button class="ghost" id="clear-chip" type="button">Clear chip</button><button class="ghost" id="next-chip" type="button">Next chip →</button></div>
           <div id="chip-feedback" class="hint" role="status"></div>
         </div>
         <details><summary>Fast bulk entry for numeric chip reveals</summary>
