@@ -21,6 +21,10 @@ cd treasures-and-trash
 npm test
 ```
 
+## No-typing card trade builder
+
+The **Trade calculator** has a tap-first card composer. Choose **RECEIVE from rival** or **GIVE to rival**, choose a suit and rank, and repeat for card bundles. Tap any card chip marked × to remove it. Cash shortcuts such as **Pay $25** and **Get $50** fill the signed cash field. The exact same trade evaluator uses these inputs as the original text fields; a proposal does not alter actual holdings until **Record this trade after agreement** is pressed after the physical trade.
+
 ## Fastest live workflow
 
 1. Select **Round 1/2/3** and the announced **treasure suit**. Its same-color counterpart is trash; the two opposite-color suits are neutral.
