@@ -23,8 +23,9 @@ function round(){return state.rounds[state.round];}
 function game(){
   const r=round();
   if(!r.games[state.game])r.games[state.game]={
-    hand:[],center:[],claim:null,claimant:(state.mySeat+1)%4,scores:r.scores.slice(),recorded:false};
+    hand:[],center:[],claim:null,claimant:(state.mySeat+1)%4,scores:r.scores.slice(),recorded:false,stage:"deal"};
   const g=r.games[state.game];
+  if(!["deal","play","result"].includes(g.stage))g.stage=g.recorded?"result":g.claim?"play":"deal";
   if(!Array.isArray(g.hand))g.hand=[];
   if(!Array.isArray(g.center))g.center=[];
   if(!Array.isArray(g.scores)||g.scores.length!==4)g.scores=r.scores.slice();
@@ -33,12 +34,78 @@ function game(){
 function seatText(i){return "Seat "+(i+1)+(i===state.mySeat?" (you)":"");}
 function historyBefore(){return round().history.filter(h=>h.game<state.game);}
 function setNotice(message){$("result-note").textContent=message;}
+const STAGES=["deal","play","result"];
+function validCards(){
+  const g=game(),expected=handSize(Number(g.scores[state.mySeat])||0);
+  return g.hand.length===expected&&g.center.length>=3&&g.center.length<=5;
+}
+function selectStage(stage){
+  if(!STAGES.includes(stage))return;
+  game().stage=stage;store();renderFlow();
+}
+function resultPreview(){
+  const g=game(),dest=$("result-summary");
+  if(!dest)return;
+  if(!g.claim){dest.textContent="Enter the final claimed hand in Claims & calls first.";return;}
+  const other=Number($("reactor").value),claimant=g.claimant;
+  if(other===claimant){dest.textContent="Select the opposing team, not the claimant.";return;}
+  const outcome=$("outcome").value;
+  const shift=payout(g.claim,outcome),before=g.scores.map(Number);
+  const predicted=before.slice();predicted[claimant]+=shift;predicted[other]-=shift;
+  dest.textContent=seatText(claimant)+" "+signed(shift)+" points; "+seatText(other)+" "+signed(-shift)+
+    " points. Next scores: "+predicted.map((v,i)=>"Seat "+(i+1)+": "+signed(v)).join(" · ")+".";
+}
+function renderFlow(){
+  const g=game(),stage=g.stage;
+  document.querySelectorAll("[data-flow-view]").forEach(el=>{el.hidden=el.dataset.flowView!==stage;});
+  document.querySelectorAll("[data-stage]").forEach(el=>{
+    const active=el.dataset.stage===stage;
+    el.classList.toggle("selected",active);
+    el.setAttribute("aria-current",active?"step":"false");
+    el.disabled=g.recorded&&el.dataset.stage==="play";
+  });
+  $("flow-position").textContent="Round "+state.round+" · Hand "+state.game+" of "+state.maxGames;
+  const message={
+    deal:"Enter the current scores, your private cards, and visible center cards.",
+    play:"Each new claim updates the reaction. Edit cards as center cards flip.",
+    result:"Choose the actual ending and opposing team. Save the result to start the next hand."
+  };
+  $("flow-explain").textContent=message[stage];
+  const expected=handSize(Number(g.scores[state.mySeat])||0);
+  $("flow-status").textContent=g.recorded?"Result saved":
+    stage==="deal"?(validCards()?"Ready for claims":g.hand.length+" / "+expected+
+      " private · "+g.center.length+" / 3+ center"):
+    stage==="play"?"Live decision mode":"Waiting for confirmed outcome";
+  $("deal-ready-status").textContent=validCards()?"Cards complete.":"You can proceed with incomplete inputs, but probabilities may be unreliable.";
+  $("play-known-summary").textContent=g.hand.length+" private + "+g.center.length+
+    " revealed center · "+(validCards()?"complete":"incomplete")+
+    (g.claim?" · Latest: "+formatClaim(g.claim):"");
+  $("flow-back").disabled=stage==="deal";
+  $("flow-next").textContent=stage==="deal"?"Continue to claims →":
+    stage==="play"?"Continue to result →":g.recorded?"Next hand →":"Record outcome + next →";
+  $("flow-next").disabled=false;
+  $("record-outcome").disabled=Boolean(g.recorded);
+  resultPreview();
+}
+function nextStage(){
+  const g=game();
+  if(g.stage==="deal")selectStage("play");
+  else if(g.stage==="play")selectStage("result");
+  else if(g.recorded){
+    if(state.game<state.maxGames)changeGame(state.game+1);
+    else if(state.round<3)changeRound(state.round+1);
+  }else $("record-outcome").click();
+}
+function previousStage(){
+  const i=STAGES.indexOf(game().stage);
+  if(i>0)selectStage(STAGES[i-1]);
+}
 function setClaim(c,claimant=null){
   if(c!==null&&!isValidClaim(c))return;
   const g=game();g.claim=c;
   if(claimant!==null)g.claimant=claimant;
   $("claim-quick").value=c?shortClaim(c):"";
-  renderClaimDisplay();store();calculate();
+  renderClaimDisplay();store();renderFlow();calculate();
 }
 function shortClaim(c){
   if(!c)return "";
@@ -95,6 +162,7 @@ function renderDeck(){
   if(g.center.length<3)issues.push("Enter the 3 face-up center cards.");
   if(g.center.length>5)issues.push("There are only 5 center cards.");
   $("card-validation").textContent=issues.length?issues.join(" "):"All your private cards entered; 3 to 5 center cards known.";
+  renderFlow();
 }
 function renderBuilder(){
   $("claim-types").innerHTML=TYPES.map(t=>'<button data-type="'+t[0]+'" class="'+(builder.type===t[0]?"selected":"")+'">'+t[1]+"</button>").join("");
@@ -186,7 +254,7 @@ function renderAll(){
   $("reactor").value=String((g.claimant+1)%4);
   if(g.recorded){$("record-outcome").disabled=true;setNotice("This sub-game already has a recorded result.");}
   else {$("record-outcome").disabled=false;setNotice("");}
-  calculate();store();
+  renderFlow();calculate();store();
 }
 function changeRound(n){state.round=n;state.game=1;renderAll();}
 function changeGame(n){state.game=clamp(n,1,state.maxGames);renderAll();}
@@ -283,7 +351,8 @@ $("record-outcome").addEventListener("click",()=>{
   g.recorded=true;r.scores=after;
   store();
   if(state.game<state.maxGames){changeGame(state.game+1);}
-  else{renderAll();setNotice("Round complete. Select the next round.");}
+  else if(state.round<3){changeRound(state.round+1);}
+  else{renderAll();setNotice("All three regular rounds complete.");}
 });
 $("undo-result").addEventListener("click",()=>{
   const r=round();if(!r.history.length){setNotice("No recorded result in this round.");return;}
@@ -293,7 +362,7 @@ $("undo-result").addEventListener("click",()=>{
   for(const [k,g] of Object.entries(r.games)){
     if(Number(k)>h.game&&!g.recorded)g.scores=r.scores.slice();
   }
-  state.game=h.game;renderAll();setNotice("Last result removed; scoreboard restored.");
+  state.game=h.game;renderAll();selectStage("result");setNotice("Last result removed; scoreboard restored.");
 });
 function paintTimer(){
   const sec=Math.max(0,timerInterval?Math.ceil((timerUntil-Date.now())/1000):timerRemaining);
@@ -309,6 +378,24 @@ document.querySelectorAll("[data-timer]").forEach(b=>b.addEventListener("click",
 $("timer-stop").addEventListener("click",()=>{
   if(timerInterval){timerRemaining=Math.max(0,Math.ceil((timerUntil-Date.now())/1000));clearInterval(timerInterval);timerInterval=null;}
   paintTimer();
+});
+
+document.querySelectorAll("[data-stage]").forEach(el=>el.addEventListener("click",()=>selectStage(el.dataset.stage)));
+$("flow-next").addEventListener("click",nextStage);
+$("flow-back").addEventListener("click",previousStage);
+$("deal-ready").addEventListener("click",()=>selectStage("play"));
+$("update-cards").addEventListener("click",()=>selectStage("deal"));
+$("to-result").addEventListener("click",()=>selectStage("result"));
+$("outcome").addEventListener("change",resultPreview);
+$("reactor").addEventListener("change",resultPreview);
+$("reset-game").addEventListener("click",()=>{
+  if(!window.confirm("Erase ALL saved Liar's Market rounds, cards, claims, scores, opponent learning and timers? This cannot be undone."))return;
+  if(timerInterval){clearInterval(timerInterval);timerInterval=null;}
+  timerRemaining=10;timerUntil=0;
+  try{localStorage.removeItem(KEY);}catch{}
+  state=fresh();zone="hand";builder={type:"pair",a:14,b:13,step:"a"};lastEvaluation=null;
+  $("claim-quick").value="";$("nuts-exists").value="";$("outcome").value="bluff-false";
+  renderAll();paintTimer();setNotice("All Liar's Market game data reset. Round 1, hand 1.");
 });
 window.addEventListener("keydown",e=>{
   if(e.altKey&&e.key==="Enter"){$("apply-quick").click();e.preventDefault();}
