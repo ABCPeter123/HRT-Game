@@ -35,7 +35,8 @@ test("only validated VAULT G5 PUB numeric quote fields survive",async()=>{
   assert.equal(data.stale,false);
   assert.deepEqual(data.snapshot.books,{
    VAULT:{bid:"160",ask:"160.25",askSize:"24"},
-   G5:{bid:"14.1",ask:"14.2",position:"-14"}});
+   G5:{bid:"14.1",ask:"14.2",position:"-14"},
+   PUB:{ask:"20.75"}});
   assert.equal(JSON.stringify(data).includes("SECRET"),false);
   assert.equal(JSON.stringify(data).includes("secret"),false);
  });
