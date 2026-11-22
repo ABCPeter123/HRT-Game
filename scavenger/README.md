@@ -4,7 +4,7 @@ Waterloo Quant Club Fall 2026 Trading Competition. This is the first interactive
 
 ## Open and play
 
-Open [the Scavenger panel](index.html) in a browser, or run a static server from the repository root:
+Use the deployed Scavenger URL when available. For local development, run a static server from the repository root:
 
 \`\`\`bash
 python -m http.server 8000
@@ -41,7 +41,7 @@ Round scoring: \`A1 + A2 + 2*A3 + final_guess_payout - pool*sqrt(samples_bought)
 
 ## Speed, privacy and testing
 
-All computations run synchronously in the local browser with small deterministic scenario sets. No network access is needed after the page assets load. A fresh page load requires the static files to be available; no offline service-worker cache is installed by default. Never rely on the panel's timer as the official game clock.
+All computations run synchronously in the local browser with small deterministic scenario sets. The hosted version registers a small service worker to cache its static assets after the first successful load; refreshes can then work offline. User inputs stay in localStorage and are not cached by the service worker. A local HTTP server also works without external services. Never rely on the panel's timer as the official game clock.
 
 Run the unit tests with Node.js 20+:
 
@@ -54,4 +54,6 @@ The tests cover sample costs, the exact auction payoff function, including cappe
 
 ## Scope
 
-The panel is an adviser. It cannot read live competition data or submit actual trades or guesses. You must manually enter observations and execute the advised action through the competition interface. The other four WQC game folders are scaffolded for their own real-time panels.
+The panel is an adviser. It cannot read live competition data or submit actual trades or guesses. You must manually enter observations and execute the advised action through the competition interface. If the lowest bid was capped (the payout is lower than the bid), the panel can infer the pool size exactly and use that for later auctions. A highest-bid payout can establish a lower bound on the pool even if the initial sample fit was weak.
+
+The other four WQC game folders are scaffolded for their own real-time panels.

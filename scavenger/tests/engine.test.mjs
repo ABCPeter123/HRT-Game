@@ -4,7 +4,7 @@ import { performance } from "node:perf_hooks";
 import {
   inverseNormal, parseSamples, sampleCostFraction, sampleHint,
   auctionPayout, guessPayout, roundScore, estimatePool,
-  optimalFinalGuess, recommendBid, inferRoomScale
+  optimalFinalGuess, recommendBid, inferRoomScale, refinePoolFromResults
 } from "../engine.js";
 
 test("sample parsing, costs and hint are consistent with the packet",()=>{
@@ -105,4 +105,17 @@ test("live recommendations compute without high-latency dependencies",()=>{
   optimalFinalGuess(e,{count:300});
   const elapsed=performance.now()-t0;
   assert.ok(elapsed<1500,"Compute took "+elapsed+"ms on test runner");
+});
+
+test("lowest rank capped payout reveals the exact pool, even without samples",()=>{
+  const r=refinePoolFromResults(null,[{bid:"50",rank:"1",payout:"35"}],6);
+  assert.equal(r.value,35);
+  assert.equal(r.lo,35);
+  assert.equal(r.hi,35);
+  assert.equal(r.confidence,"EXACT FROM PAYOUT");
+});
+test("highest rank underpaid establishes residual lower bound",()=>{
+  const prior=estimatePool({percentile:50,samples:"10 15 17 20 25"});
+  const r=refinePoolFromResults(prior,[{bid:"100",rank:"6",payout:"-40"}],6);
+  assert.ok(r.value>=30);
 });

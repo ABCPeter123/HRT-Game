@@ -5,7 +5,7 @@ Independent projects for trading competitions. Each game keeps its own source co
 | Project | Folder | Status |
 | --- | --- | --- |
 | HRT AlgoArena stock/news prediction | [algoarena](algoarena/) | Existing research and source |
-| Scavenger | [scavenger](scavenger/) | Ready for development |
+| Scavenger | [scavenger](scavenger/) | **Live decision panel available** |
 | Baskets | [baskets](baskets/) | Ready for development |
 | Vault | [vault](vault/) | Ready for development |
 | Treasures & Trash | [treasures-and-trash](treasures-and-trash/) | Ready for development |

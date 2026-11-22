@@ -22,3 +22,6 @@ venv/
 
 model_params.pkl
 predictions_blend.csv
+
+# Static site build output
+/dist/

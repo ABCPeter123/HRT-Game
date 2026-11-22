@@ -16,7 +16,7 @@ export function finite(value, fallback = 0) {
 export function parseSamples(input) {
   if (Array.isArray(input)) return input.map(Number).filter(Number.isFinite).slice(0, 200);
   if (!String(input ?? "").trim()) return [];
-  return String(input).split(/[\s,;|]+/).map(Number).filter(Number.isFinite).slice(0, 200);
+  return String(input).trim().split(/[\s,;|]+/).filter(Boolean).map(Number).filter(Number.isFinite).slice(0, 200);
 }
 export function sampleCostFraction(n) {
   return Math.sqrt(Math.max(0, finite(n))) / 12;
@@ -194,6 +194,36 @@ export function optimalFinalGuess(estimate, {seed=2026,count=300}={}) {
     if(expected>best.expected){best={guess,expected,chance:hits/pools.length};}
   }
   return { ...best,mid:quantile(pools,0.5),low:quantile(pools,0.1),high:quantile(pools,0.9)};
+}
+export function refinePoolFromResults(estimate, history = [], roomSize = 6) {
+  let minimum = 0, exact = null;
+  for (const entry of history) {
+    if (entry?.bid === "" || entry?.rank === "" || entry?.payout === "" ||
+      entry?.bid == null || entry?.rank == null || entry?.payout == null) continue;
+    const bid=Number(entry.bid),rank=Number(entry.rank),paid=Number(entry.payout);
+    if (![bid,rank,paid].every(Number.isFinite) || bid<0 || rank<1 || rank>roomSize) continue;
+    if(rank===1) {
+      if(paid < bid - 1e-8 && paid>=0) exact=paid;
+      else if(Math.abs(paid-bid)<1e-7) minimum=Math.max(minimum,bid);
+    } else if(rank===roomSize) {
+      // A high bidder gets residual - |residual - bid|.
+      // If underpaid, residual=(bid+payout)/2; the total pool is at least residual.
+      const residual=paid<bid-1e-8?(bid+paid)/2:bid;
+      minimum=Math.max(minimum,residual);
+    } else if(rank<=3 && paid>=0) {
+      minimum=Math.max(minimum,paid);
+    }
+  }
+  if(exact!==null) return {value:exact,lo:exact,hi:exact,n:estimate?.n || 0,
+    family:"Inferred from capped lowest bid",confidence:"EXACT FROM PAYOUT",
+    standardError:0.001,candidates:[{name:"Observed pool",value:exact,weight:1}]};
+  if(!estimate) return null;
+  if(minimum<=0 || minimum<=estimate.lo) return estimate;
+  // Lower-bound conditioning, not an exact fit to unknown prior probabilities.
+  const candidates=estimate.candidates.map(c=>({...c,value:Math.max(minimum,c.value)}));
+  const value=candidates.reduce((total,c)=>total+c.value*c.weight,0);
+  return {...estimate,value,lo:minimum,hi:Math.max(minimum+1,estimate.hi),
+    family:estimate.family+" + payout bound",candidates};
 }
 export function inferRoomScale(history, estimate, roomSize=6) {
   if(!estimate?.value || !history?.length)return 1;

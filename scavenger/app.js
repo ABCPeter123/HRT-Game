@@ -1,6 +1,6 @@
 import {
   PHASES, clamp, parseSamples, sampleHint, sampleCostFraction, estimatePool,
-  recommendBid, optimalFinalGuess, roundScore, guessPayout
+  recommendBid, optimalFinalGuess, refinePoolFromResults, roundScore, guessPayout
 } from "./engine.js";
 
 const STORAGE_KEY = "quant-comp-scavenger-v1";
@@ -175,7 +175,8 @@ function render() {
 }
 function renderAdvice() {
   const r=current(),p=r.phase;
-  const pool=estimatePool({percentile:number(r.percentile,50),samples:r.samples,anchor:r.anchor});
+  const initialPool=estimatePool({percentile:number(r.percentile,50),samples:r.samples,anchor:r.anchor});
+  const pool=p===0?initialPool:refinePoolFromResults(initialPool,r.auctions.slice(0,p-1),state.roomSize);
   const cost=sampleCostFraction(number(r.sampleCount));
   const metrics=[],set=(k,v)=>metrics.push(metric(k,v));
   $("confidenceChip").textContent=pool?.confidence||"NO SCALE";
@@ -278,6 +279,14 @@ function handleInput(e) {
     current().auctions[number(el.dataset.auction)][el.dataset.auctionField]=el.value;
   }else if(el.dataset.field){
     current()[el.dataset.field]=el.value;
+    if(el.dataset.field==="samples") {
+      const observed=parseSamples(el.value).length;
+      if(number(current().sampleCount)<observed) {
+        current().sampleCount=String(observed);
+        document.querySelectorAll('[data-choice="sampleCount"]').forEach(btn=>
+          btn.classList.toggle("selected",number(btn.dataset.value)===observed));
+      }
+    }
     if(el.dataset.field==="percentile"&&el.value!==""){
       current().percentile=String(clamp(number(el.value),0,100));
     }
@@ -335,3 +344,6 @@ document.addEventListener("keydown",e=>{
 interval=setInterval(tick,150);
 remaining=WINDOW_SECONDS[phase()];
 render();
+if("serviceWorker" in navigator && location.protocol.startsWith("http")) {
+  navigator.serviceWorker.register("../sw.js").catch(()=>{});
+}
